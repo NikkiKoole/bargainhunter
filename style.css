@@ -101,6 +101,16 @@ td.place{max-width:190px;overflow:hidden;text-overflow:ellipsis}
 .drawer .fig{background:var(--panel2);border-radius:var(--radius);padding:7px 9px}
 .drawer .fig b{display:block;font-size:16px}
 .drawer .fig span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.locator{margin:14px 0;display:flex;gap:12px;align-items:center}
+.locator svg{width:132px;height:auto;flex:none;overflow:visible}
+.locator .land{fill:var(--panel2);stroke:var(--line);stroke-width:2;
+  stroke-linejoin:round;fill-rule:evenodd}
+.locator .dept{fill:var(--accent);fill-opacity:.32;stroke:var(--accent);stroke-width:3;
+  stroke-linejoin:round}
+.locator .pin{fill:var(--accent);stroke:var(--panel);stroke-width:4}
+.locator .pin-halo{fill:var(--accent);fill-opacity:.2}
+.locator figcaption{color:var(--dim);font-size:12px}
+
 .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:12px 0}
 .shots img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;background:var(--panel2)}
 .drawer .desc{white-space:pre-wrap;line-height:1.55}

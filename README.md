@@ -15,6 +15,8 @@ can sort, filter and map — instead of clicking through pages of 14 results.
 * **Price history and new/gone tracking.** Every run records price changes, so
   "what got cheaper" and "what's new since last week" are queries, not memory.
 * **Map view** of whatever your filters currently select, with thumbnails in the pins.
+* **A locator map on every listing**, showing where in France it is with its
+  departement highlighted — the point of searching the whole country at once.
 * **Several areas in one database**, filtered by the "gebied" facet. A listing found by
   more than one search is stored once and belongs to both.
 
@@ -163,6 +165,7 @@ franimo/serve.py    localhost UI + JSON API
 franimo/newsearch.py  add a radius search / size it up first
 franimo/compact.py    gzip cache files written before the cache was compressed
 franimo/prune.py      drop listings outside the price range you care about
+franimo/make_map.py   regenerate web/france.js (the locator map outline)
 franimo/web/        the page itself
 db/franimo.db       the database (gitignored)
 index.html          the published page (written by export)
@@ -231,6 +234,23 @@ Cannes house at €7,000 with 6 rooms is a complete record with a wrong price at
 the source. Hiding listings that merely look too good is the opposite of what a
 bargain-finder should do, so the tool shows franimo's data faithfully —
 including where franimo is wrong.
+
+## The locator map
+
+`franimo/web/france.js` holds 96 departement outlines as SVG paths, simplified
+with Ramer-Douglas-Peucker to ~7,500 points (90KB, 25KB gzipped, fetched once).
+It is generated from [france-geojson](https://github.com/gregoiredavid/france-geojson)
+(IGN data, Licence Ouverte) and committed, so no build step or GIS dependency is
+needed:
+
+```sh
+python3 -m franimo.make_map path/to/departements-version-simplifiee.geojson
+```
+
+Listings are matched to a departement on an accent-folded name with any
+parenthetical removed, so "Ardeche" finds "Ardèche" and "Paris (Seine)" finds
+"Paris". The 130 overseas listings (Guadeloupe, Réunion, Guyane...) fall outside
+the frame and say so rather than showing a misleading pin.
 
 ## Notes
 

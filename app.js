@@ -268,6 +268,51 @@ function renderMap(rows) {
   setTimeout(() => map.invalidateSize(), 50);
 }
 
+// ---------- locator map ----------
+
+// "Ardeche" vs "Ardèche", "Paris (Seine)" vs "Paris": match on a folded name.
+const fold = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s*\(.*\)\s*/g, '').trim().toLowerCase();
+
+let DEPT_BY_NAME = null;
+function deptPath(name) {
+  if (!window.FRANCE) return null;
+  if (!DEPT_BY_NAME) {
+    DEPT_BY_NAME = {};
+    for (const [n, d] of Object.entries(FRANCE.depts)) DEPT_BY_NAME[fold(n)] = d;
+  }
+  return DEPT_BY_NAME[fold(name)] || null;
+}
+
+function locator(r) {
+  if (!window.FRANCE) return '';
+  const { w, h, proj, depts } = FRANCE;
+  const all = Object.values(depts).join(' ');
+  const mine = deptPath(r.dept_fr) || deptPath(r.dept_nl);
+
+  let dot = '';
+  const inFrame = r.lat != null && r.lon != null
+    && r.lon * proj.kx >= proj.minx && r.lon * proj.kx <= proj.maxx
+    && r.lat >= proj.miny && r.lat <= proj.maxy;
+  if (inFrame) {
+    const x = (r.lon * proj.kx - proj.minx) / (proj.maxx - proj.minx) * w;
+    const y = (proj.maxy - r.lat) / (proj.maxy - proj.miny) * h;
+    dot = `<circle class="pin-halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26"/>
+           <circle class="pin" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11"/>`;
+  }
+
+  return `<figure class="locator">
+    <svg viewBox="0 0 ${w} ${h}" role="img"
+         aria-label="ligging in Frankrijk: ${r.place || ''} ${r.dept_fr || ''}">
+      <path class="land" d="${all}"/>
+      ${mine ? `<path class="dept" d="${mine}"/>` : ''}
+      ${dot}
+    </svg>
+    <figcaption>${r.dept_fr || r.dept_nl || ''}${inFrame ? '' :
+      ' — buiten het Franse vasteland'}</figcaption>
+  </figure>`;
+}
+
 // ---------- drawer ----------
 window.__open = id => openDrawer(ALL.find(r => r.id === id));
 
@@ -316,6 +361,7 @@ async function openDrawer(r) {
     </div>
     ${r.price_drop ? `<p class="drop">prijs verlaagd met ${eur(r.price_drop)}
        ${r.first_price ? `(was ${eur(r.old_price || r.first_price)})` : ''}</p>` : ''}
+    ${locator(r)}
     <a class="open" href="${r.url}" target="_blank" rel="noopener">open op franimo ↗</a>
     ${r.features ? `<div class="feat">${r.features}</div>` : ''}
     <div class="desc">${(r.description || r.snippet || '').replace(/</g, '&lt;')}</div>
