@@ -95,7 +95,7 @@ def write_json(path: Path, payload) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default="docs")
+    ap.add_argument("--out", default=".")
     ap.add_argument("--db", default=str(db.DB_PATH))
     ap.add_argument("--no-photos", action="store_true",
                     help="skip the photo index (smaller; drawer shows no photo strip)")

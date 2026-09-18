@@ -1,7 +1,7 @@
-# franimo-local
+# krottenkijker
 
-A local replacement for browsing [franimo.nl](https://www.franimo.nl) (Dutch portal for
-French property). Scrapes saved searches into SQLite and serves a single dense page you
+A better way to browse [franimo.nl](https://www.franimo.nl) (Dutch portal for French
+property). Scrapes saved searches into SQLite and serves a single dense page you
 can sort, filter and map — instead of clicking through pages of 14 results.
 
 ## What it does that the site doesn't
@@ -54,13 +54,17 @@ detail backfill run in the background.
 
 ```sh
 python3 -m franimo.scrape        # refresh the data
-python3 -m franimo.export        # rebuild docs/
+python3 -m franimo.export        # rebuild index.html + data/
+git add -A && git commit -m "data refresh" && git push
 ```
 
-`docs/` is the whole site with no Python in it: the same UI reading packed JSON
-instead of the local API. It works from a `file://` path, GitHub Pages (point
-Pages at the `docs/` folder), or any static host. Re-run `export` after every
-scrape; it overwrites the previous build.
+The published site is `index.html`, `app.js`, `style.css` and `data/*.json` at
+the repo root — the same UI reading packed JSON instead of the local API, with
+no Python in it. GitHub Pages serves it from `main` at root; it also works from
+a `file://` path or any static host. Re-run `export` after every scrape.
+
+The database lives in `db/` (gitignored) so it doesn't collide with the
+published `data/`.
 
 The payload is packed rather than dumped, because a plain dump of 10k listings
 is 14.7MB:
@@ -160,7 +164,9 @@ franimo/newsearch.py  add a radius search / size it up first
 franimo/compact.py    gzip cache files written before the cache was compressed
 franimo/prune.py      drop listings outside the price range you care about
 franimo/web/        the page itself
-data/franimo.db     the database
+db/franimo.db       the database (gitignored)
+index.html          the published page (written by export)
+data/*.json         the published data (written by export)
 ```
 
 ## Pruning

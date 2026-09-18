@@ -2,11 +2,7 @@
 cache/
 
 # the database and its backups/journals: derived data
-data/*.db
-data/*.db-journal
-data/*.db-wal
-data/*.db-shm
-data/*.bak
+db/
 
 __pycache__/
 *.pyc

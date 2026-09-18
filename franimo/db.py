@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "data" / "franimo.db"
+DB_PATH = ROOT / "db" / "franimo.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
