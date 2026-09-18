@@ -20,6 +20,9 @@ can sort, filter and map — instead of clicking through pages of 14 results.
 * **Several areas in one database**, filtered by the "gebied" facet. A listing found by
   more than one search is stored once and belongs to both.
 
+Working on this with an agent? `CLAUDE.md` has the order of operations and the
+traps; this file is the reference.
+
 ## Setup
 
 ```sh
