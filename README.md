@@ -1,4 +1,4 @@
-# krottenkijker
+# bargainhunter
 
 A better way to browse [franimo.nl](https://www.franimo.nl) (Dutch portal for French
 property). Scrapes saved searches into SQLite and serves a single dense page you
