@@ -50,6 +50,44 @@ upsert — nothing is duplicated and nothing is lost.
 Typical flow for a big search: `--no-details` first so the UI is usable, then let the
 detail backfill run in the background.
 
+## Publishing a static copy
+
+```sh
+python3 -m franimo.scrape        # refresh the data
+python3 -m franimo.export        # rebuild docs/
+```
+
+`docs/` is the whole site with no Python in it: the same UI reading packed JSON
+instead of the local API. It works from a `file://` path, GitHub Pages (point
+Pages at the `docs/` folder), or any static host. Re-run `export` after every
+scrape; it overwrites the previous build.
+
+The payload is packed rather than dumped, because a plain dump of 10k listings
+is 14.7MB:
+
+| | raw | over the wire |
+|---|---|---|
+| `listings.json` | 6.2 MB | 1.5 MB |
+| `photos.json` | 2.8 MB | 0.4 MB |
+
+How: columnar rows (30 key names aren't repeated 10,129 times), dictionary
+coding for columns whose values repeat (`type`, `dept_nl`, `agent`, and the
+timestamp columns, which hold one value per scrape run), a prefix dictionary for
+image paths (the CDN prefix alone is ~50 characters), and derived fields
+(`eur_m2`, `price_drop`, `days_known`) computed in the browser instead of
+shipped. `days_known` is therefore correct however old the export is.
+
+Each rebuild adds roughly its compressed size to git history and that never
+shrinks — a handful of re-scrapes is fine, hundreds would not be.
+
+## Mobile
+
+The page is usable on a phone: filters slide in over the content behind a ☰
+button, the card grid is the default view (a 12-column table is not a phone
+layout, though it is still there and scrolls sideways), and the detail panel
+goes full width. The filter panel is offset by the header's measured height
+rather than a hard-coded value, since the header wraps to two lines when narrow.
+
 ## Adding an area
 
 ```sh
