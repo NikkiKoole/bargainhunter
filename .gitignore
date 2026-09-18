@@ -1,0 +1,13 @@
+# scraped HTML: rebuildable, and large
+cache/
+
+# the database and its backups/journals: derived data
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/*.bak
+
+__pycache__/
+*.pyc
+.DS_Store

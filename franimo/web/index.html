@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Franimo Local</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+<header>
+  <h1>franimo<span>local</span></h1>
+  <div id="summary" class="summary">laden…</div>
+  <nav class="views">
+    <button data-view="table" class="on">tabel</button>
+    <button data-view="grid">foto's</button>
+    <button data-view="map">kaart</button>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside id="filters">
+    <label class="f"><span>zoek in tekst</span>
+      <input id="q" type="search" placeholder="schuur, bron, vijver, grange…"></label>
+
+    <div class="row">
+      <label class="f"><span>prijs van</span><input id="pmin" type="number" step="1000" placeholder="0"></label>
+      <label class="f"><span>tot</span><input id="pmax" type="number" step="1000" placeholder="∞"></label>
+    </div>
+    <div class="row">
+      <label class="f"><span>€/m² max</span><input id="em2max" type="number" step="50" placeholder="∞"></label>
+      <label class="f"><span>slaapk. min</span><input id="bedmin" type="number" step="1" placeholder="0"></label>
+    </div>
+    <div class="row">
+      <label class="f"><span>woning m² min</span><input id="livmin" type="number" step="10" placeholder="0"></label>
+      <label class="f"><span>terrein m² min</span><input id="landmin" type="number" step="100" placeholder="0"></label>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="onlydrop"> alleen prijsverlaging</label>
+      <label><input type="checkbox" id="onlynew"> alleen nieuw (<input id="newdays" type="number" value="7" min="1"> dgn)</label>
+      <label><input type="checkbox" id="hidegone" checked> verdwenen verbergen</label>
+      <label><input type="checkbox" id="needm2"> alleen met m² bekend</label>
+    </div>
+
+    <div class="facet" id="facet-area"></div>
+    <div class="facet" id="facet-type"></div>
+    <div class="facet" id="facet-region"></div>
+    <div class="facet" id="facet-dept"></div>
+    <div class="facet" id="facet-energy"></div>
+
+    <button id="reset" class="reset">filters wissen</button>
+    <p class="hint" id="runinfo"></p>
+  </aside>
+
+  <main>
+    <div id="table-view" class="view on"></div>
+    <div id="grid-view" class="view"></div>
+    <div id="map-view" class="view"><div id="map"></div></div>
+  </main>
+</div>
+
+<div id="drawer" class="drawer"><button id="drawer-close">×</button><div id="drawer-body"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

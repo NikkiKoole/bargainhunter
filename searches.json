@@ -1,0 +1,44 @@
+{
+  "boerderijen-oost": {
+    "label": "Boerderijen/herenhuizen/horeca — 240km rond Ardennen",
+    "note": "Your original franimo search: property types 3, 7, 12, 20, 34 (boerderij, herenhuis, dorpsboerderij, bar-cafe, hotel), no price cap, cheapest first.",
+    "path": "/woning/?pricefrom=0&priceto=999999999&zonestype=or&areaid=0&longitude=5.207519531250001&latitude=49.35375571830993&zoom=7&kmrange_custom=240.2321964770487&savedproperties=false&kmrange=0&rooms=0&propertytypes%5B%5D=20&propertytypes%5B%5D=3&propertytypes%5B%5D=12&propertytypes%5B%5D=7&propertytypes%5B%5D=34&submitted=true&orderby=price%20asc"
+  },
+  "breed-oost": {
+    "label": "Alles behalve appartement/nieuwbouw/kantoor — 240km rond Ardennen",
+    "note": "All franimo property types except 2 (appartement), 31/32 (nieuwbouw) and 33 (kantoor): ~6.8k listings. Filter by type in the UI rather than here.  [superseded by france-150k; run by name if you want it]",
+    "path": "/woning/?pricefrom=0&priceto=999999999&zonestype=or&areaid=0&longitude=5.207519531250001&latitude=49.35375571830993&zoom=7&kmrange_custom=240.2321964770487&savedproperties=false&kmrange=0&rooms=0&propertytypes%5B%5D=1&propertytypes%5B%5D=3&propertytypes%5B%5D=4&propertytypes%5B%5D=5&propertytypes%5B%5D=6&propertytypes%5B%5D=7&propertytypes%5B%5D=8&propertytypes%5B%5D=9&propertytypes%5B%5D=10&propertytypes%5B%5D=11&propertytypes%5B%5D=12&propertytypes%5B%5D=13&propertytypes%5B%5D=14&propertytypes%5B%5D=15&propertytypes%5B%5D=16&propertytypes%5B%5D=17&propertytypes%5B%5D=18&propertytypes%5B%5D=19&propertytypes%5B%5D=20&propertytypes%5B%5D=21&propertytypes%5B%5D=22&propertytypes%5B%5D=23&propertytypes%5B%5D=24&propertytypes%5B%5D=25&propertytypes%5B%5D=26&propertytypes%5B%5D=27&propertytypes%5B%5D=28&propertytypes%5B%5D=29&propertytypes%5B%5D=30&propertytypes%5B%5D=34&submitted=true&orderby=price%20asc",
+    "enabled": false
+  },
+  "annecy-300": {
+    "label": "300km rond Annecy",
+    "note": "radius search: 300km around (45.8992, 6.1294); types 1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,34  [superseded by france-150k; run by name if you want it]",
+    "path": "/woning/?pricefrom=0&priceto=999999999&zonestype=or&areaid=0&longitude=6.1294&latitude=45.8992&zoom=7&kmrange_custom=300.0&savedproperties=false&kmrange=0&rooms=0&propertytypes%5B%5D=1&propertytypes%5B%5D=3&propertytypes%5B%5D=4&propertytypes%5B%5D=5&propertytypes%5B%5D=6&propertytypes%5B%5D=7&propertytypes%5B%5D=8&propertytypes%5B%5D=9&propertytypes%5B%5D=10&propertytypes%5B%5D=11&propertytypes%5B%5D=12&propertytypes%5B%5D=13&propertytypes%5B%5D=14&propertytypes%5B%5D=15&propertytypes%5B%5D=16&propertytypes%5B%5D=17&propertytypes%5B%5D=18&propertytypes%5B%5D=19&propertytypes%5B%5D=20&propertytypes%5B%5D=21&propertytypes%5B%5D=22&propertytypes%5B%5D=23&propertytypes%5B%5D=24&propertytypes%5B%5D=25&propertytypes%5B%5D=26&propertytypes%5B%5D=27&propertytypes%5B%5D=28&propertytypes%5B%5D=29&propertytypes%5B%5D=30&propertytypes%5B%5D=34&submitted=true&orderby=price%20asc",
+    "enabled": false
+  },
+  "morvan-60": {
+    "label": "Morvan — 60km rond Château-Chinon/Saulieu",
+    "note": "radius search: 60km around (47.15, 3.98); types 1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,34  [superseded by france-150k; run by name if you want it]",
+    "path": "/woning/?pricefrom=0&priceto=999999999&zonestype=or&areaid=0&longitude=3.98&latitude=47.15&zoom=7&kmrange_custom=60.0&savedproperties=false&kmrange=0&rooms=0&propertytypes%5B%5D=1&propertytypes%5B%5D=3&propertytypes%5B%5D=4&propertytypes%5B%5D=5&propertytypes%5B%5D=6&propertytypes%5B%5D=7&propertytypes%5B%5D=8&propertytypes%5B%5D=9&propertytypes%5B%5D=10&propertytypes%5B%5D=11&propertytypes%5B%5D=12&propertytypes%5B%5D=13&propertytypes%5B%5D=14&propertytypes%5B%5D=15&propertytypes%5B%5D=16&propertytypes%5B%5D=17&propertytypes%5B%5D=18&propertytypes%5B%5D=19&propertytypes%5B%5D=20&propertytypes%5B%5D=21&propertytypes%5B%5D=22&propertytypes%5B%5D=23&propertytypes%5B%5D=24&propertytypes%5B%5D=25&propertytypes%5B%5D=26&propertytypes%5B%5D=27&propertytypes%5B%5D=28&propertytypes%5B%5D=29&propertytypes%5B%5D=30&propertytypes%5B%5D=34&submitted=true&orderby=price%20asc",
+    "enabled": false
+  },
+  "france-150k": {
+    "label": "Heel Frankrijk tot €150k",
+    "note": "whole of France; up to EUR 150,000; types 1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,34",
+    "path": "/woning/?pricefrom=0&priceto=150000&zonestype=or&propertytypes%5B%5D=1&propertytypes%5B%5D=3&propertytypes%5B%5D=4&propertytypes%5B%5D=5&propertytypes%5B%5D=6&propertytypes%5B%5D=7&propertytypes%5B%5D=8&propertytypes%5B%5D=9&propertytypes%5B%5D=10&propertytypes%5B%5D=11&propertytypes%5B%5D=12&propertytypes%5B%5D=13&propertytypes%5B%5D=14&propertytypes%5B%5D=15&propertytypes%5B%5D=16&propertytypes%5B%5D=17&propertytypes%5B%5D=18&propertytypes%5B%5D=19&propertytypes%5B%5D=20&propertytypes%5B%5D=21&propertytypes%5B%5D=22&propertytypes%5B%5D=23&propertytypes%5B%5D=24&propertytypes%5B%5D=25&propertytypes%5B%5D=26&propertytypes%5B%5D=27&propertytypes%5B%5D=28&propertytypes%5B%5D=29&propertytypes%5B%5D=30&propertytypes%5B%5D=34&submitted=true&orderby=price%20asc",
+    "bands": [
+      [
+        0,
+        75000
+      ],
+      [
+        75001,
+        150000
+      ]
+    ],
+    "skip": {
+      "priceless": true,
+      "above": 150000
+    }
+  }
+}

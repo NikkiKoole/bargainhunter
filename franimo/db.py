@@ -1,0 +1,218 @@
+"""SQLite storage.
+
+Design notes:
+  * `listings` holds the latest known state of every property we've ever seen.
+  * `price_history` gets a row only when a price actually changes, so
+    "what got cheaper" is a query, not a guess.
+  * `first_seen` / `last_seen` / `gone_at` let the UI answer "what's new?" and
+    "what disappeared?" from the second run onwards. The first run just
+    establishes the baseline.
+"""
+from __future__ import annotations
+
+import json
+import re
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / "franimo.db"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS listings (
+    id              INTEGER PRIMARY KEY,
+    url             TEXT,
+    type            TEXT,
+    place           TEXT,
+    region          TEXT,
+    dept_nl         TEXT,
+    dept_fr         TEXT,
+    lat             REAL,
+    lon             REAL,
+    price           INTEGER,
+    old_price       INTEGER,
+    rooms           INTEGER,
+    bedrooms        INTEGER,
+    baths           INTEGER,
+    living_m2       INTEGER,
+    land_m2         INTEGER,
+    year_built      INTEGER,
+    energy_label    TEXT,
+    gas_label       TEXT,
+    energy_kwh      INTEGER,
+    gas_co2         INTEGER,
+    reference       TEXT,
+    agent           TEXT,
+    agent_name      TEXT,
+    agent_address   TEXT,
+    snippet         TEXT,
+    description     TEXT,
+    features        TEXT,
+    thumb           TEXT,
+    photos          TEXT,      -- json array
+    raw_fields      TEXT,      -- json object, everything we didn't model
+    promoted        INTEGER DEFAULT 0,
+    first_seen      TEXT,
+    last_seen       TEXT,
+    detail_fetched  TEXT,
+    gone_at         TEXT
+);
+
+-- append-only: one row per observed price change (plus the first sighting)
+CREATE TABLE IF NOT EXISTS price_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id  INTEGER NOT NULL,
+    seen_at     TEXT NOT NULL,
+    price       INTEGER
+);
+
+-- which saved search turned up which listing
+CREATE TABLE IF NOT EXISTS listing_search (
+    listing_id  INTEGER NOT NULL,
+    search      TEXT NOT NULL,
+    last_seen   TEXT,
+    PRIMARY KEY (listing_id, search)
+);
+
+CREATE TABLE IF NOT EXISTS runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    search      TEXT,
+    started_at  TEXT,
+    finished_at TEXT,
+    pages       INTEGER,
+    seen        INTEGER,
+    new         INTEGER,
+    price_drops INTEGER,
+    price_rises INTEGER,
+    gone        INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_listings_price ON listings(price);
+CREATE INDEX IF NOT EXISTS idx_listings_gone  ON listings(gone_at);
+CREATE INDEX IF NOT EXISTS idx_hist_listing   ON price_history(listing_id);
+"""
+
+LIST_COLS = ("url", "type", "place", "dept_nl", "lat", "lon", "price", "old_price",
+             "beds", "thumb", "snippet", "promoted")
+DETAIL_COLS = ("url", "type", "place", "region", "dept_nl", "dept_fr", "price", "rooms",
+               "bedrooms", "baths", "living_m2", "land_m2", "year_built", "energy_label",
+               "gas_label", "energy_kwh", "gas_co2", "reference", "agent", "agent_name", "agent_address",
+               "description", "features", "photos", "raw_fields")
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def connect(path: Path | str = DB_PATH) -> sqlite3.Connection:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # A scrape can be running while you prune or browse, so wait for the write
+    # lock rather than failing instantly. WAL lets the UI read during a scrape.
+    con = sqlite3.connect(path, timeout=60)
+    con.row_factory = sqlite3.Row
+    con.execute("PRAGMA busy_timeout = 60000")
+    try:
+        con.execute("PRAGMA journal_mode = WAL")
+    except sqlite3.OperationalError:
+        pass
+    con.executescript(SCHEMA)
+    _migrate(con)
+    return con
+
+
+def _migrate(con: sqlite3.Connection) -> None:
+    """Add any columns declared in SCHEMA that an older database is missing."""
+    have = {r["name"] for r in con.execute("PRAGMA table_info(listings)")}
+    block = SCHEMA.split("CREATE TABLE IF NOT EXISTS listings (", 1)[1].split(");", 1)[0]
+    for line in block.splitlines():
+        m = re.match(r"\s+(\w+)\s+(INTEGER|TEXT|REAL)\b", line)
+        if m and m.group(1) not in have:
+            try:
+                con.execute(f"ALTER TABLE listings ADD COLUMN {m.group(1)} {m.group(2)}")
+            except sqlite3.OperationalError:
+                pass
+    con.commit()
+
+
+def _encode(value: Any) -> Any:
+    return json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else value
+
+
+def upsert_from_list(con: sqlite3.Connection, row: dict, search: str, ts: str) -> str:
+    """Insert or update a listing from a search-result card.
+
+    Returns 'new', 'price_drop', 'price_rise' or 'same'.
+    """
+    lid = row["id"]
+    prev = con.execute("SELECT price, gone_at FROM listings WHERE id=?", (lid,)).fetchone()
+
+    data = {k: row.get(k) for k in LIST_COLS if k in row}
+    data["baths"] = row.get("baths")
+    data["bedrooms"] = row.get("beds")  # card's bed icon is the bedroom count
+    data.pop("beds", None)
+    data["promoted"] = int(bool(row.get("promoted")))
+    data["last_seen"] = ts
+    data["gone_at"] = None
+
+    if prev is None:
+        data["id"] = lid
+        data["first_seen"] = ts
+        cols = ", ".join(data)
+        con.execute(f"INSERT INTO listings ({cols}) VALUES ({', '.join('?' * len(data))})",
+                    [_encode(v) for v in data.values()])
+        con.execute("INSERT INTO price_history (listing_id, seen_at, price) VALUES (?,?,?)", (lid, ts, row.get("price")))
+        status = "new"
+    else:
+        # Never blank out detail-page fields with the card's sparser data.
+        data = {k: v for k, v in data.items() if v is not None or k == "gone_at"}
+        sets = ", ".join(f"{k}=?" for k in data)
+        con.execute(f"UPDATE listings SET {sets} WHERE id=?", [*(_encode(v) for v in data.values()), lid])
+        old, new = prev["price"], row.get("price")
+        if new is not None and old is not None and new != old:
+            con.execute("INSERT INTO price_history (listing_id, seen_at, price) VALUES (?,?,?)", (lid, ts, new))
+            status = "price_drop" if new < old else "price_rise"
+        else:
+            status = "same"
+
+    con.execute("INSERT OR REPLACE INTO listing_search VALUES (?,?,?)", (lid, search, ts))
+    return status
+
+
+# Columns where a parsed None means "really unknown", so a re-parse can clear a
+# value we stored earlier. Everything else is only ever filled in, never blanked.
+CLEARABLE = ("living_m2",)
+
+
+def update_from_detail(con: sqlite3.Connection, lid: int, detail: dict, ts: str) -> None:
+    data = {k: detail.get(k) for k in DETAIL_COLS if detail.get(k) is not None}
+    if detail.get("raw_fields"):           # we did parse the info table, so trust it
+        for col in CLEARABLE:
+            if detail.get(col) is None:
+                data[col] = None
+    data["detail_fetched"] = ts
+    sets = ", ".join(f"{k}=?" for k in data)
+    con.execute(f"UPDATE listings SET {sets} WHERE id=?", [*(_encode(v) for v in data.values()), lid])
+
+
+def mark_gone(con: sqlite3.Connection, search: str, ts: str) -> int:
+    """Anything previously found by this search but absent from this run."""
+    cur = con.execute("""
+        UPDATE listings SET gone_at=?
+        WHERE gone_at IS NULL
+          AND id IN (SELECT listing_id FROM listing_search WHERE search=? AND last_seen<>?)
+    """, (ts, search, ts))
+    return cur.rowcount
+
+
+def needs_detail(con: sqlite3.Connection, ids: list[int]) -> list[int]:
+    """Listings we've never pulled a detail page for."""
+    if not ids:
+        return []
+    marks = ",".join("?" * len(ids))
+    rows = con.execute(
+        f"SELECT id FROM listings WHERE id IN ({marks}) AND detail_fetched IS NULL", ids
+    ).fetchall()
+    return [r["id"] for r in rows]
