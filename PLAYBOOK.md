@@ -17,7 +17,8 @@ checklist.
 5. both Abruzzo adapters, full €100k (`api-houses-100k`, `arp-houses-100k`)
 6. Centrarium `ct-me-houses-100k` (5s crawl-delay; ~43 houses)
 7. Mubawab `mw-ma-houses-100k` (MAD `:pr:0-1100000`; ~375 houses)
-8. **only then** export, and only when you want Pages updated
+8. home.ge `hg-ge-houses-100k` (EUR GET filter; ~84 houses)
+9. **only then** export, and only when you want Pages updated
 
 ## Commands
 
@@ -56,6 +57,10 @@ python3 -m centrarium.scrape ct-me-houses-100k --detail-limit 20
 # 7. Mubawab — MAD :pr:0-1100000 (~375 / 12 pages). Titled urban/peri-urban only.
 python3 -m mubawab.scrape mw-ma-houses-100k --no-details
 python3 -m mubawab.scrape mw-ma-houses-100k --detail-limit 20
+
+# 8. home.ge — EUR GET filter (~84 / 2 pages). Non-ag freehold only.
+python3 -m homege.scrape hg-ge-houses-100k --no-details
+python3 -m homege.scrape hg-ge-houses-100k
 ```
 
 Look before you publish:
@@ -72,7 +77,9 @@ and the next run resumes, cheapest-first. Drop the cap on the Abruzzo 100k
 searches — they are hundreds of rows, not thousands. Centrarium's enabled
 seed is also small (~43); keep the 5s gap. Mubawab's enabled seed is
 ~375 / 12 pages; `PRICE_ASC` does not actually sort, so do not stop
-early — finish the `:pr:` band.
+early — finish the `:pr:` band. home.ge's enabled seed is ~84 / 2
+pages; drop the cap. First GET can bounce on a session cookie — the
+Fetcher retries.
 
 **Never delete `cache/`.** Every fetched page is gzipped, keyed by sha1(full
 URL). `--redetail` re-parses from disk with zero requests. Do not move cache
@@ -96,7 +103,7 @@ must not become the published payload.
 
 The UI is already multi-source: source badge + **bron** facet. One export
 packs every row in the database — franimo, Bulgaria, Japan, Holprop, both
-Abruzzo agencies, Centrarium, Mubawab. There is no per-source publish step.
+Abruzzo agencies, Centrarium, Mubawab, home.ge. There is no per-source publish step.
 
 Export when you want https://mipolai.com/bargainhunter/ updated, not after
 every scrape:
@@ -125,6 +132,8 @@ want it in the default pass.
 | `ct-me-houses` | centrarium | all 826 Montenegro houses, no price skip |
 | `mw-ma-houses-150k` | mubawab | wider MAD band (1.6M DH / 701 listings) |
 | `mw-ma-houses` | mubawab | all 2,017 Morocco houses, no price filter |
+| `hg-ge-houses-150k` | homege | wider EUR band (136 listings) |
+| `hg-ge-houses` | homege | all-price house-for-sale category (7 pages) |
 
 ```sh
 python3 -m ok_bulgaria.scrape bg-houses-100k --no-details
@@ -135,6 +144,8 @@ python3 -m abruzzoruralproperty.scrape arp-houses-150k --no-details
 python3 -m centrarium.scrape ct-me-houses --no-details
 python3 -m mubawab.scrape mw-ma-houses-150k --no-details
 python3 -m mubawab.scrape mw-ma-houses --no-details
+python3 -m homege.scrape hg-ge-houses-150k --no-details
+python3 -m homege.scrape hg-ge-houses --no-details
 ```
 
 `jp-akita` and `api-houses-50k` are also parked (regional / narrower). Same

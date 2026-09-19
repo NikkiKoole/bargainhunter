@@ -224,5 +224,29 @@
     "note": "Unfiltered /en/sc/houses-for-sale — 2,017 listings / 64 pages on 2026-09-19. Parked (volume); run by name. Prefer the :pr: band plus skip.above.",
     "path": "/en/sc/houses-for-sale",
     "enabled": false
+  },
+  "hg-ge-houses-100k": {
+    "source": "homege",
+    "label": "home.ge Georgia houses ≤ €100k",
+    "note": "home.ge EN house-for-sale search /en/saxlebi-agarakebi/search-results.html with the site's own GET filter f[Category_ID]=88 (House For Sale) and f[price][to]=100000&f[price][currency]=euro. Verified 2026-09-19: 84 ads / 2 pages (48 per page). Query-string price filter works (unfiltered sale category is 7 pages). Display currency is USD by default (70,000.00 $ / JSON-LD USD); we convert at the documented 0.85 EUR/USD so $110k cards stay under the EUR skip. First anonymous GET is an empty 200 + session cookie (Refresh: 0) — Fetcher retries. Pagination is /search-results/indexN.html (page 1 omits it). robots.txt Allow: /; ?sort_by= is an indexer rule — do not sort that way. Georgia: foreigners can own non-agricultural freehold (houses, household plots); agricultural land is generally restricted. Seed is houses only, not /miwis-nakveti/ land.",
+    "path": "/en/saxlebi-agarakebi/search-results.html?action=search&post_form_key=saxlebi_agarakebi_quick&f[Category_ID]=88&f[price][from]=0&f[price][to]=100000&f[price][currency]=euro",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "hg-ge-houses-150k": {
+    "source": "homege",
+    "label": "home.ge Georgia houses ≤ €150k",
+    "note": "Same GET filter, euro to=150000. Verified 2026-09-19: 136 ads / 3 pages. Parked; run by name.",
+    "path": "/en/saxlebi-agarakebi/search-results.html?action=search&post_form_key=saxlebi_agarakebi_quick&f[Category_ID]=88&f[price][from]=0&f[price][to]=150000&f[price][currency]=euro",
+    "enabled": false
+  },
+  "hg-ge-houses": {
+    "source": "homege",
+    "label": "home.ge Georgia houses for sale (all prices)",
+    "note": "Unfiltered /en/saxlebi-agarakebi/iyideba-saxlebi-agarakebi.html — 7 pages on 2026-09-19. Parked; run by name. Prefer the euro price band plus skip.above.",
+    "path": "/en/saxlebi-agarakebi/iyideba-saxlebi-agarakebi.html",
+    "enabled": false
   }
 }
