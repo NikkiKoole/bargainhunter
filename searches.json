@@ -136,11 +136,35 @@
     "path": "/sale/pt/villa-house/scr/greece/price/100000/",
     "enabled": false
   },
-  "hp-it-houses-100k": {
+    "hp-it-houses-100k": {
     "source": "holprop",
     "label": "Holprop Italy houses under €100k",
     "note": "Italy is usable on Holprop: /sale/pt/villa-house/scr/italy/price/100000/ had 319 houses on 2026-09-19 (unfiltered /sale/villa-house/italy/ is ~2,787). Parked; run by name.",
     "path": "/sale/pt/villa-house/scr/italy/price/100000/",
+    "enabled": false
+  },
+  "api-houses-100k": {
+    "source": "abruzzopropertyitaly",
+    "label": "Abruzzo Property Italy ≤ €100k",
+    "note": "abruzzopropertyitaly.com tilde search /property-search~for=1,minprice=0,maxprice=100000,order=priceasc,do=search. GET of that URL returns HTML (query-string ?minprice= on /property-search is ignored). Verified 2026-09-19: 155 listings / 4 pages (50 per page), cheapest first (pid 3223 Prezza €12k). type[] is not honoured in the tilde URL — this is the site's own ≤€100k bucket, all types. The site's pager drops the price filter; we keep minprice/maxprice and set page= ourselves (0-based; page 1 omits it).",
+    "path": "/property-search~for=1,minprice=0,maxprice=100000,order=priceasc,do=search",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "api-houses-50k": {
+    "source": "abruzzopropertyitaly",
+    "label": "Abruzzo Property Italy ≤ €50k",
+    "note": "Same tilde search, maxprice=50000. Verified 2026-09-19: 50 listings / 1 page. Parked; run by name.",
+    "path": "/property-search~for=1,minprice=0,maxprice=50000,order=priceasc,do=search",
+    "enabled": false
+  },
+  "api-houses-150k": {
+    "source": "abruzzopropertyitaly",
+    "label": "Abruzzo Property Italy ≤ €150k",
+    "note": "Same tilde search, maxprice=150000. Verified 2026-09-19: 196 listings / 4 pages. Parked; run by name.",
+    "path": "/property-search~for=1,minprice=0,maxprice=150000,order=priceasc,do=search",
     "enabled": false
   }
 }
