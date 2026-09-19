@@ -3,7 +3,7 @@
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
 Akiya Portal, Holprop, Abruzzo Property Italy, Abruzzo Rural Property,
-Centrarium, Mubawab, and home.ge.
+Centrarium, Mubawab, home.ge, and Bulgarian Properties.
 Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
@@ -24,6 +24,7 @@ python3 -m abruzzoruralproperty.scrape    # 1f. Abruzzo Rural Property (separate
 python3 -m centrarium.scrape              # 1g. Centrarium (separate process; 5s crawl-delay)
 python3 -m mubawab.scrape                 # 1h. Mubawab Morocco (separate process)
 python3 -m homege.scrape                  # 1i. home.ge Georgia (separate process)
+python3 -m bulgarianproperties.scrape     # 1j. Bulgarian Properties (separate process)
 python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -41,8 +42,8 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
 OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy,
-Abruzzo Rural Property, Mubawab and home.ge default to 0.6s / 1 worker. Centrarium
-defaults to 5s / 1 worker (`robots.txt` Crawl-delay: 5).
+Abruzzo Rural Property, Mubawab, home.ge and Bulgarian Properties default to
+0.6s / 1 worker. Centrarium defaults to 5s / 1 worker (`robots.txt` Crawl-delay: 5).
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
 minutes and makes the UI usable; the detail backfill is the long pole (~3.3 pages/s).
@@ -74,7 +75,9 @@ experiments at `--db db/scratch.db` so a trial cannot trash the real file.
 `python3 -m mubawab.scrape` only runs `mubawab`
 (e.g. `mw-ma-houses-100k`);
 `python3 -m homege.scrape` only runs `homege`
-(e.g. `hg-ge-houses-100k`).
+(e.g. `hg-ge-houses-100k`);
+`python3 -m bulgarianproperties.scrape` only runs `bulgarianproperties`
+(e.g. `bp-bg-under-10k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -134,6 +137,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, price, currency, living_m2, land_m2
   FROM listings WHERE source='homege' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, price, currency, living_m2, land_m2
+  FROM listings WHERE source='bulgarianproperties' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -166,7 +173,8 @@ the browser, not stored, so a published build doesn't go stale.
 ## Adding a source adapter
 
 `ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly`,
-`abruzzoruralproperty`, `centrarium`, `mubawab` and `homege` are in.
+`abruzzoruralproperty`, `centrarium`, `mubawab`, `homege` and
+`bulgarianproperties` are in.
 Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
@@ -253,6 +261,20 @@ foreigners can own non-agricultural freehold (houses, household
 plots); agricultural land is generally restricted. Detail ids are
 numeric (`…-478109.html`). Area ≥ 1000 m² with no Yard is treated as
 land (cottage cards echo the parcel into Area).
+
+Bulgarian Properties displays EUR on cards (`€ 10 900`; JSON-LD
+`priceCurrency: EUR`) with a JS £/$ switcher. We store euro and keep
+GBP/USD in `raw_fields`. If a card has only pounds, convert with the
+documented rate in `bulgarianproperties/fx.py` (1.163 EUR/GBP — the
+portal's own dual display, not a live ECB feed). The seed is the
+site's static under-£10k browse
+`/properties-in-bulgaria-under-ten-thousand-pounds.html` — verified
+live (37 listings / 2 pages on 2026-09-19). `skip.above` is EUR 15000.
+`robots.txt` Disallow `/*search`, `*minprice=`, `*maxprice=`, `*page=`
+— never use `/Search/index.php` or query-string filters. Pagination is
+a path suffix (`…pounds1.html` / `/indexN.html`); never `index0.html`.
+Detail ids are `ADxxxxxBG`. Complements ok_bulgaria (different
+inventory). Anonymous datacenter GET works.
 
 ## Regenerating the locator map
 
