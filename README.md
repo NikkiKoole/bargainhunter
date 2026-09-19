@@ -5,8 +5,9 @@ A better way to browse cheap property listings. Today that means
 [OK Bulgaria](https://www.cheap-bulgarian-house.co.uk/) (UK-facing Bulgarian
 houses), [Akiya Portal](https://akiyaportal.com/) (English listings of
 vacant houses in Japan), [Holprop](https://www.holprop.com/) (multi-country
-foreigner portal), and [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com/)
-(English Abruzzo/Molise agency). The scrape → SQLite → static page pipeline is
+foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com/)
+(English Abruzzo/Molise agency), and [Abruzzo Rural Property](https://www.abruzzoruralproperty.com/)
+(second English Abruzzo/Molise agency). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -43,6 +44,7 @@ python3 -m ok_bulgaria.scrape      # enabled OK Bulgaria searches
 python3 -m akiyaportal.scrape      # enabled Akiya Portal searches
 python3 -m holprop.scrape          # enabled Holprop searches
 python3 -m abruzzopropertyitaly.scrape  # enabled Abruzzo Property Italy searches
+python3 -m abruzzoruralproperty.scrape  # enabled Abruzzo Rural Property searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
@@ -332,12 +334,60 @@ Prices are **EUR** asking prices. Sale pages still print a leftover
 "PCM" label next to the euro figure — we ignore it. 0.00 SQM on a card
 means "not stated", not a zero-area home.
 
+## Abruzzo Rural Property
+
+[abruzzoruralproperty.com](https://www.abruzzoruralproperty.com/) is a
+second English-language Abruzzo/Molise agency (different stock from
+Abruzzo Property Italy). Public list/detail pages only. Anonymous
+datacenter GET works; no captcha on a 2026-09-19 probe. `robots.txt`
+disallows Joomla internals, `request_info` and `email_to_friend` —
+not the for-sale list.
+
+```sh
+python3 -m abruzzoruralproperty.scrape arp-houses-100k --no-details --max-pages 1   # trial
+python3 -m abruzzoruralproperty.scrape arp-houses-100k --no-details                 # all ~58 list pages
+python3 -m abruzzoruralproperty.scrape arp-houses-100k --detail-limit 20            # then details
+python3 -m abruzzoruralproperty.scrape arp-houses-150k --no-details --max-pages 1   # parked 150k, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`). Default
+gap is 0.6s and default workers is 1 — be kind; do not run this in parallel
+with another scrape of the same host.
+
+The for-sale list is `/find-a-property/for-sale?start=0` (then start=6,
+12, …; 6 cards per page). The site's own GET price slider works:
+
+`/find-a-property/for-sale?search[price_from]=0&search[price_to]=100000&fwrealestate_update_search=1`
+
+The pager keeps those `search[]` params. Page 1 omits `start=` so cache
+keys match the seed URL.
+
+Verified live on 2026-09-19:
+
+| search | End `start=` | ~cards |
+|---|---|---|
+| `arp-houses-100k` (enabled) | 342 | ~345 |
+| `arp-houses-150k` (parked) | 360 | ~361 |
+| unfiltered `/for-sale` | 372 | ~375 |
+
+That count includes SOLD / UNDER OFFER cards with no euro figure —
+`skip.priceless` drops them at ingest. The catalogue is larger than a
+quick "current stock" eyeball (~72) because sold history stays on the
+list.
+
+Detail ids are numeric CMS ids:
+`/find-a-property/for-sale/item/1792-…` (Fossalto €42k). `external_id`
+is that id; the agency ref (FL4245) is `reference`. Prices are **EUR**
+asking prices (€42.000). Site-wide `geo.position` is the San Salvo
+office, not the listing — we do not store it as lat/lon.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
 `ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk; `akiyaportal/` scrapes
 akiyaportal.com; `holprop/` scrapes holprop.com; `abruzzopropertyitaly/`
-scrapes abruzzopropertyitaly.com. Each CLI only runs its own source.
+scrapes abruzzopropertyitaly.com; `abruzzoruralproperty/` scrapes
+abruzzoruralproperty.com. Each CLI only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -356,6 +406,7 @@ ok_bulgaria/        cheap-bulgarian-house.co.uk adapter + CLI
 akiyaportal/        akiyaportal.com adapter + CLI
 holprop/            holprop.com adapter + CLI
 abruzzopropertyitaly/  abruzzopropertyitaly.com adapter + CLI
+abruzzoruralproperty/  abruzzoruralproperty.com adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
