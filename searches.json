@@ -45,5 +45,29 @@
       "priceless": true,
       "above": 150000
     }
+  },
+  "bg-houses-50k": {
+    "source": "ok_bulgaria",
+    "label": "OK Bulgaria houses £0–50k",
+    "note": "cheap-bulgarian-house.co.uk search; prices stored in EUR as the portal states the selling price. skip.above is EUR (~£50k ≈ €58k).",
+    "path": "/bulgaria_houses.php?stab=1&action=search&low_price=0&high_price=50000",
+    "skip": {
+      "priceless": true,
+      "above": 60000
+    }
+  },
+  "bg-houses-100k": {
+    "source": "ok_bulgaria",
+    "label": "OK Bulgaria houses £0–100k",
+    "note": "wider band; parked until you want it. Run by name.",
+    "path": "/bulgaria_houses.php?stab=1&action=search&low_price=0&high_price=100000",
+    "enabled": false
+  },
+  "bg-houses-150k": {
+    "source": "ok_bulgaria",
+    "label": "OK Bulgaria houses £0–150k",
+    "note": "wider band; parked until you want it. Run by name.",
+    "path": "/bulgaria_houses.php?stab=1&action=search&low_price=0&high_price=150000",
+    "enabled": false
   }
 }

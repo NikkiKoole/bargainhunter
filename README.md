@@ -1,11 +1,11 @@
 # bargainhunter
 
 A better way to browse cheap property listings. Today that means
-[franimo.nl](https://www.franimo.nl) (Dutch portal for French property);
-the scrape → SQLite → static page pipeline is built so other portals can
-plug in later. Scrapes saved searches into one database and serves a single
-dense page you can sort, filter and map — instead of clicking through pages
-of 14 results.
+[franimo.nl](https://www.franimo.nl) (Dutch portal for French property) and
+[OK Bulgaria](https://www.cheap-bulgarian-house.co.uk/) (UK-facing Bulgarian
+houses). The scrape → SQLite → static page pipeline is shared; each portal
+is a `core.adapter` package. Scrapes saved searches into one database and
+serves a single dense page you can sort, filter and map.
 
 ## What it does that the site doesn't
 
@@ -35,9 +35,13 @@ pip install -r requirements.txt
 ## Use
 
 ```sh
-python3 -m franimo.scrape          # scrape every search in searches.json
+python3 -m franimo.scrape          # enabled franimo searches
+python3 -m ok_bulgaria.scrape      # enabled OK Bulgaria searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
+
+Each CLI only runs searches for its own `"source"`. A bare
+`python3 -m franimo.scrape` will not touch Bulgaria.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -151,6 +155,8 @@ The current set:
 |---|---|---|---|
 | `france-150k` | **all of France up to €150k**, 30 types | ~10.4k | active |
 | `boerderijen-oost` | the original: boerderij, herenhuis, dorpsboerderij, bar-café, hotel | ~212 | active |
+| `bg-houses-50k` | **OK Bulgaria houses £0–50k** | ~1.3k | active |
+| `bg-houses-100k` / `bg-houses-150k` | same site, wider GBP bands |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -160,14 +166,41 @@ The current set:
 explicitly still runs it. Nothing already scraped is lost — filter by region or
 department in the UI instead.
 
-Searches overlap; listings are deduplicated by franimo id, and a detail page
-already fetched for one search is never fetched again for another.
+Searches overlap; listings are deduplicated by `(source, external_id)`, and a
+detail page already fetched for one search is never fetched again for another.
 
-## Multi-source layout (Phase 0)
+## OK Bulgaria
 
-Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter.
-`python3 -m franimo.scrape` / `export` / `serve` still work (thin wrappers).
-Phase 1 will add `ok_bulgaria` and `akiyaportal` adapters — not this tree.
+[cheap-bulgarian-house.co.uk](https://www.cheap-bulgarian-house.co.uk/) is a
+classic PHP listing site (OK Bulgaria). Public list/detail pages only;
+`robots.txt` disallows `/admin_files/`, `/_db_backups/`, `/images/`, `/support/`.
+
+```sh
+python3 -m ok_bulgaria.scrape bg-houses-50k --no-details --max-pages 1   # trial
+python3 -m ok_bulgaria.scrape bg-houses-50k --no-details                 # all list pages
+python3 -m ok_bulgaria.scrape bg-houses-50k --detail-limit 50            # then details
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`). Default
+gap is 0.6s and default workers is 1 — be kind; do not run this in parallel
+with another scrape of the same host.
+
+The site's own copy says the **selling price is euro**; the pound figure is
+"for reference only and can vary daily." We store `price` + `currency=EUR` as
+the portal displays them, and keep the £ amount in `raw_fields`. If a card
+has only pounds, we convert with a documented fixed rate (`ok_bulgaria/fx.py`,
+≈1.166 EUR/GBP, matching their dual display — not a live ECB feed).
+
+List pagination on the site uses a PHP session (`?page=N&use_session=yes`).
+The scraper never follows that URL: it keeps the search query (`low_price` /
+`high_price`) and sets `page=` itself, so the HTML cache stays a function of
+the full URL.
+
+## Multi-source layout
+
+Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
+`ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk. Each CLI only runs its
+own source. `akiyaportal` is not in this tree yet.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -182,6 +215,7 @@ core/searches.py    searches.json loader (`source` defaults to franimo)
 core/export.py      SQLite → packed JSON + static UI at repo root
 core/serve.py       localhost UI + JSON API
 core/adapter.py     SourceAdapter protocol / registry
+ok_bulgaria/        cheap-bulgarian-house.co.uk adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first

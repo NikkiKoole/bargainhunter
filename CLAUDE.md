@@ -12,7 +12,8 @@ Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 ## Refreshing the data — the whole sequence
 
 ```sh
-python3 -m franimo.scrape                 # 1. list pages, then detail pages
+python3 -m franimo.scrape                 # 1a. franimo list + detail pages
+python3 -m ok_bulgaria.scrape             # 1b. OK Bulgaria (separate process; do not parallelise hosts)
 python3 -m franimo.export                 # 2. rebuild index.html + data/*.json
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -22,9 +23,10 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 
 ## Rules that matter
 
-**One scraper at a time.** The rate limit (`MIN_GAP` in `core.http`, default
-gap 0.3s on the franimo CLI) is a process-wide lock, so two processes double
-the request rate at the host. Chain runs; don't parallelise them.
+**One scraper at a time per host.** The rate limit (`MIN_GAP` in `core.http`)
+is a process-wide lock, so two processes double the request rate at the host.
+Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
+OK Bulgaria defaults to 0.6s / 1 worker.
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
 minutes and makes the UI usable; the detail backfill is the long pole (~3.3 pages/s).
@@ -42,7 +44,8 @@ Rows are unique on `(source, external_id)`. `id` is an internal integer — do
 not assume it equals the portal id once a second source exists.
 
 **`searches.json` `"source"`** selects the adapter. Omitted source means
-`franimo`. `python3 -m franimo.scrape` only runs franimo searches.
+`franimo`. `python3 -m franimo.scrape` only runs franimo searches;
+`python3 -m ok_bulgaria.scrape` only runs `ok_bulgaria` (e.g. `bg-houses-50k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -70,6 +73,10 @@ sqlite3 -box db/franimo.db "
          ROUND(price*1.0/living_m2) eur_m2
   FROM listings WHERE living_m2 >= 80 AND price <= 100000
   ORDER BY eur_m2 LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, type, place, price, currency, land_m2
+  FROM listings WHERE source='ok_bulgaria' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -99,9 +106,10 @@ The static build ships packed JSON (columnar + dictionary-coded); `unpack()` in
 Derived fields (`eur_m2`, `eur_m2_land`, `price_drop`, `days_known`) are computed in
 the browser, not stored, so a published build doesn't go stale.
 
-## Adding a source adapter (Phase 1 — not this PR)
+## Adding a source adapter
 
-Next adapters: `ok_bulgaria`, `akiyaportal`. Each is its own package that:
+`ok_bulgaria` is in. Next is `akiyaportal` — do not start that here. Each
+adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
   `register()`s itself
@@ -109,8 +117,13 @@ Next adapters: `ok_bulgaria`, `akiyaportal`. Each is its own package that:
   `external_id` set (never reuse another portal's integer `id`)
 * is selected by `"source"` on a searches.json entry
 * uses `core.http.Fetcher(base=..., gap=...)` so cache keys stay sha1(full URL)
+* has its own `python3 -m <pkg>.scrape` CLI (franimo will refuse foreign names)
 
-Do not scrape those sites until that PR. Do not invent a second database.
+Do not invent a second database. Do not overwrite published `data/` with a
+tiny one-source export; use `--out` if you need a local static build.
+
+OK Bulgaria selling prices are euro (portal copy); GBP is stored in
+`raw_fields`. See `ok_bulgaria/fx.py` if a card has pounds only.
 
 ## Regenerating the locator map
 
