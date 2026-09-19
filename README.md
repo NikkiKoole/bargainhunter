@@ -10,8 +10,9 @@ foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com
 (second English Abruzzo/Molise agency), [Centrarium](https://centrarium.com/)
 (English Montenegro / Balkans houses), [Mubawab](https://www.mubawab.ma/en)
 (English/French Morocco houses), [home.ge](https://www.home.ge/en/)
-(English Georgia houses), and [Bulgarian Properties](https://www.bulgarianproperties.com/)
-(English Bulgaria houses). The scrape → SQLite → static page pipeline is
+(English Georgia houses), [Bulgarian Properties](https://www.bulgarianproperties.com/)
+(English Bulgaria houses), and [Domaza](https://www.domaza.com/)
+(Balkans multi-country portal). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -53,11 +54,12 @@ python3 -m centrarium.scrape       # enabled Centrarium searches
 python3 -m mubawab.scrape          # enabled Mubawab searches
 python3 -m homege.scrape           # enabled home.ge searches
 python3 -m bulgarianproperties.scrape  # enabled Bulgarian Properties searches
+python3 -m domaza.scrape           # enabled Domaza searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge or Bulgarian Properties.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge, Bulgarian Properties or Domaza.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -88,6 +90,7 @@ Holprop (home IP) → both Abruzzo 100k searches → Centrarium
 `ct-me-houses-100k` (5s crawl-delay) → Mubawab `mw-ma-houses-100k` →
 home.ge `hg-ge-houses-100k` →
 Bulgarian Properties `bp-bg-under-10k` →
+Domaza `dz-me-houses` →
 export last, and only when you want Pages updated.
 
 ## Publishing a static copy
@@ -204,6 +207,8 @@ The current set:
 | `hg-ge-houses-150k` / `hg-ge-houses` | same site, €150k band / all-price sale category |  | parked |
 | `bp-bg-under-10k` | **Bulgarian Properties under £10k** | ~37 | active |
 | `bp-bg-rural-houses` / `bp-bg-houses` | same site, 830 rural houses / all 1,173 houses |  | parked |
+| `dz-me-houses` | **Domaza Montenegro houses** (ingest ≤ €100k) | ~100 | active |
+| `dz-al-houses` / `dz-rs-houses` / `dz-ge-houses` | Domaza Albania / Serbia / Georgia — thin, leftover foreign cards |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -608,6 +613,54 @@ List cards give living m² / garden; lat/lon come from the detail-page
 map embed. Reserved / sold cards stay in (flagged in `raw_fields`).
 Complements ok_bulgaria — different agency stock.
 
+## Domaza
+
+[domaza.com](https://www.domaza.com/) is a Balkans multi-country portal
+(Montenegro / Serbia / Albania / Georgia coverage is uneven). Public
+list/detail pages only. Anonymous datacenter GET works (Apache; no
+Cloudflare challenge on a 2026-09-19 probe). `robots.txt` disallows
+account/admin helpers and sets `Crawl-delay: 10` — we stay at the shared
+0.6s floor and never overlap another scrape of this host.
+
+```sh
+python3 -m domaza.scrape dz-me-houses --no-details --max-pages 1   # trial
+python3 -m domaza.scrape dz-me-houses --no-details                 # all 5 list pages
+python3 -m domaza.scrape dz-me-houses --detail-limit 20            # then details
+python3 -m domaza.scrape dz-rs-houses --no-details --max-pages 1   # parked RS, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`).
+Default gap is 0.6s and default workers is 1.
+
+Country house lists are stable SEO paths
+(`/house_{country}-17-4340-{country_id}-0-0-0-sl/`). `17` is the .com EN
+site id, `4340` is the House tag. Verified 2026-09-19:
+
+| country | id | listings | pages | search |
+|---|---|---|---|---|
+| Montenegro | 146 | ~100 | 5 | `dz-me-houses` (enabled; cards are actually House) |
+| Albania | 3 | 12 leftovers | 1 | `dz-al-houses` (parked; .com EN leaked Greece cards) |
+| Serbia | 193 | 12 mixed | 1 | `dz-rs-houses` (parked) |
+| Georgia | 80 | 12 mixed | 1 | `dz-ge-houses` (parked) |
+
+Pagination is `/_page/N/`; page 1 omits it. Detail ids are numeric
+(` /house_suscepan_…-17-8687837-p/`). `external_id` is that id.
+
+**Do not seed `/s/HASH` filter URLs.** The search form POSTs to
+`/properties_all/` and lands on `/property/index/search/1/s/{sha1}/` or
+`/r/s/{token}`. Those expire — a live HASH 301'd to
+`/real_estate_in_montenegro/` on 2026-09-19. Path extras `_pricefrom/`
+and `?priceto=` are ignored, so the price cap is `skip.above` at ingest.
+
+`.com` prints **USD** until a session GET of
+`/ajaxfeeds/currency/currency/EUR`. We store `price` + `currency=EUR`
+(portal euro when the HTML has it) and keep `$` in `raw_fields`. If a
+cached page is dollars-only we convert with a documented fixed rate
+(`domaza/fx.py`, 0.87 EUR/USD — matching `$3,446` → `€3,000`; not a live
+ECB feed). 0.000 lat/lon on a card means "not stated". House lists can
+include a `to rent` card — we record `raw_fields.deal` and leave the
+price as the portal states it.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
@@ -617,8 +670,8 @@ scrapes abruzzopropertyitaly.com; `abruzzoruralproperty/` scrapes
 abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com;
 `mubawab/` scrapes mubawab.ma;
 `homege/` scrapes home.ge;
-`bulgarianproperties/` scrapes bulgarianproperties.com. Each CLI
-only runs its own source.
+`bulgarianproperties/` scrapes bulgarianproperties.com;
+`domaza/` scrapes domaza.com. Each CLI only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -642,6 +695,7 @@ centrarium/         centrarium.com adapter + CLI
 mubawab/            mubawab.ma adapter + CLI
 homege/             home.ge adapter + CLI
 bulgarianproperties/  bulgarianproperties.com adapter + CLI
+domaza/             domaza.com adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
