@@ -136,7 +136,7 @@
     "path": "/sale/pt/villa-house/scr/greece/price/100000/",
     "enabled": false
   },
-    "hp-it-houses-100k": {
+  "hp-it-houses-100k": {
     "source": "holprop",
     "label": "Holprop Italy houses under €100k",
     "note": "Italy is usable on Holprop: /sale/pt/villa-house/scr/italy/price/100000/ had 319 houses on 2026-09-19 (unfiltered /sale/villa-house/italy/ is ~2,787). Parked; run by name.",
@@ -271,6 +271,37 @@
     "label": "Bulgarian Properties houses (all prices)",
     "note": "Unfiltered /Houses_in_Bulgaria/index.html — 1,173 listings / 40 pages on 2026-09-19. Parked (volume); run by name. Pager is /indexN.html (page 1 is index.html; never index0 — robots Disallow). Prefer the under-£10k browse plus skip.above.",
     "path": "/Houses_in_Bulgaria/index.html",
+    "enabled": false
+  },
+  "dz-me-houses": {
+    "source": "domaza",
+    "label": "Domaza Montenegro houses",
+    "note": "Stable country house list /house_montenegro-17-4340-146-0-0-0-sl/ (site 17, House tag 4340, country 146). Verified 2026-09-19: 20 cards/page, 5 pages (~100), cards are actually House. Path extras _pricefrom/ / ?priceto= are ignored. The search form's price filter lands on opaque /s/{sha} or /r/s/{token} URLs that expire (a live HASH 301'd to /real_estate_in_montenegro/) — do not seed those. skip.above is EUR at ingest; the list itself is unfiltered and includes the odd 'to rent' card (surface it, don't hide).",
+    "path": "/house_montenegro-17-4340-146-0-0-0-sl/",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "dz-al-houses": {
+    "source": "domaza",
+    "label": "Domaza Albania houses",
+    "note": "Same house-tag URL for Albania (country id 3): /house_albania-17-4340-3-0-0-0-sl/. Verified 2026-09-19: 12 mixed leftover cards (Greece plots/houses), no pager — .com EN coverage is thin and the house filter leaks other countries. The parser records each card's own country. Parked; run by name. Do not replace with a /s/HASH URL.",
+    "path": "/house_albania-17-4340-3-0-0-0-sl/",
+    "enabled": false
+  },
+  "dz-rs-houses": {
+    "source": "domaza",
+    "label": "Domaza Serbia houses",
+    "note": "Country id 193. Verified 2026-09-19: 12 mixed cards, no pager (house filter leaky / coverage thin). Parked; run by name. Do not replace this path with a /s/HASH filter URL.",
+    "path": "/house_serbia-17-4340-193-0-0-0-sl/",
+    "enabled": false
+  },
+  "dz-ge-houses": {
+    "source": "domaza",
+    "label": "Domaza Georgia houses",
+    "note": "Country id 80. Verified 2026-09-19: 12 mixed cards, no pager (coverage uneven). Parked; run by name.",
+    "path": "/house_georgia-17-4340-80-0-0-0-sl/",
     "enabled": false
   }
 }

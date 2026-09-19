@@ -19,7 +19,8 @@ checklist.
 7. Mubawab `mw-ma-houses-100k` (MAD `:pr:0-1100000`; ~375 houses)
 8. home.ge `hg-ge-houses-100k` (EUR GET filter; ~84 houses)
 9. Bulgarian Properties `bp-bg-under-10k` (static under-£10k browse; ~37)
-10. **only then** export, and only when you want Pages updated
+10. Domaza `dz-me-houses` (enable AL / RS / GE if you want them)
+11. **only then** export, and only when you want Pages updated
 
 ## Commands
 
@@ -67,6 +68,14 @@ python3 -m homege.scrape hg-ge-houses-100k
 #    robots Disallow search query paths; do not use /Search/index.php.
 python3 -m bulgarianproperties.scrape bp-bg-under-10k --no-details
 python3 -m bulgarianproperties.scrape bp-bg-under-10k
+
+# 10. Domaza — country house lists (not /s/HASH filter URLs)
+python3 -m domaza.scrape dz-me-houses --no-details
+python3 -m domaza.scrape dz-me-houses --detail-limit 200
+# parked countries, by name (or flip "enabled" in searches.json first):
+# python3 -m domaza.scrape dz-al-houses --no-details
+# python3 -m domaza.scrape dz-rs-houses --no-details
+# python3 -m domaza.scrape dz-ge-houses --no-details
 ```
 
 Look before you publish:
@@ -111,8 +120,8 @@ must not become the published payload.
 
 The UI is already multi-source: source badge + **bron** facet. One export
 packs every row in the database — franimo, Bulgaria, Japan, Holprop, both
-Abruzzo agencies, Centrarium, Mubawab, home.ge, Bulgarian Properties.
-There is no per-source publish step.
+Abruzzo agencies, Centrarium, Mubawab, home.ge, Bulgarian Properties,
+Domaza. There is no per-source publish step.
 
 Export when you want https://mipolai.com/bargainhunter/ updated, not after
 every scrape:
@@ -145,6 +154,7 @@ want it in the default pass.
 | `hg-ge-houses` | homege | all-price house-for-sale category (7 pages) |
 | `bp-bg-rural-houses` | bulgarianproperties | 830 rural houses / 28 pages |
 | `bp-bg-houses` | bulgarianproperties | all 1,173 houses / 40 pages |
+| `dz-al-houses` / `dz-rs-houses` / `dz-ge-houses` | domaza | thin; .com EN leftover foreign cards |
 
 ```sh
 python3 -m ok_bulgaria.scrape bg-houses-100k --no-details
@@ -159,6 +169,7 @@ python3 -m homege.scrape hg-ge-houses-150k --no-details
 python3 -m homege.scrape hg-ge-houses --no-details
 python3 -m bulgarianproperties.scrape bp-bg-rural-houses --no-details
 python3 -m bulgarianproperties.scrape bp-bg-houses --no-details
+python3 -m domaza.scrape dz-rs-houses --no-details
 ```
 
 `jp-akita` and `api-houses-50k` are also parked (regional / narrower). Same
