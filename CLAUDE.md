@@ -2,8 +2,8 @@
 
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
-and Akiya Portal. Shared HTTP/DB/export live in `core/` so adapters plug
-in without rewriting that path. `README.md` is the reference; this file
+Akiya Portal, and Holprop. Shared HTTP/DB/export live in `core/` so adapters
+plug in without rewriting that path. `README.md` is the reference; this file
 is the order of operations and the things that are easy to get wrong.
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
@@ -14,6 +14,7 @@ Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 python3 -m franimo.scrape                 # 1a. franimo list + detail pages
 python3 -m ok_bulgaria.scrape             # 1b. OK Bulgaria (separate process; do not parallelise hosts)
 python3 -m akiyaportal.scrape             # 1c. Akiya Portal (separate process)
+python3 -m holprop.scrape                 # 1d. Holprop (separate process)
 python3 -m franimo.export                 # 2. rebuild index.html + data/*.json
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -26,7 +27,7 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 **One scraper at a time per host.** The rate limit (`MIN_GAP` in `core.http`)
 is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
-OK Bulgaria and Akiya Portal default to 0.6s / 1 worker.
+OK Bulgaria, Akiya Portal and Holprop default to 0.6s / 1 worker.
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
 minutes and makes the UI usable; the detail backfill is the long pole (~3.3 pages/s).
@@ -46,7 +47,8 @@ not assume it equals the portal id once a second source exists.
 **`searches.json` `"source"`** selects the adapter. Omitted source means
 `franimo`. `python3 -m franimo.scrape` only runs franimo searches;
 `python3 -m ok_bulgaria.scrape` only runs `ok_bulgaria` (e.g. `bg-houses-50k`);
-`python3 -m akiyaportal.scrape` only runs `akiyaportal` (e.g. `jp-houses-10k`).
+`python3 -m akiyaportal.scrape` only runs `akiyaportal` (e.g. `jp-houses-10k`);
+`python3 -m holprop.scrape` only runs `holprop` (e.g. `hp-es-houses-100k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -82,6 +84,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, price, currency, living_m2, land_m2
   FROM listings WHERE source='akiyaportal' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, price, currency, living_m2, land_m2
+  FROM listings WHERE source='holprop' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -113,8 +119,8 @@ the browser, not stored, so a published build doesn't go stale.
 
 ## Adding a source adapter
 
-`ok_bulgaria` and `akiyaportal` are in. Do not start Holprop here. Each
-adapter is its own package that:
+`ok_bulgaria`, `akiyaportal` and `holprop` are in. Do not start
+Centrarium or Mubawab here. Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
   `register()`s itself
@@ -135,6 +141,14 @@ the documented fixed rates in `akiyaportal/fx.py` (0.85 EUR/USD, 170 JPY/EUR;
 not a live ECB feed) and keep the original in `raw_fields`. The seed search
 is `/listings?max_price=10000` — the site's own Under $10k bucket, verified
 live — not the 2,234-page unfiltered index.
+
+Holprop displays EUR (GBP/USD sit next to it on detail pages). We store
+`price` + `currency=EUR` and keep the extras in `raw_fields`. Searches are
+per-country house filters
+(`/sale/pt/villa-house/scr/{country}/price/100000/`). Spain is the enabled
+seed (68 listings); Bulgaria / Portugal / Greece / Italy are parked. Italy
+has a usable house+price URL (319 under €100k) — not a skip. Detail ids are
+`bg62388419`-style; keep `?ctype=EUR` on the stored URL.
 
 ## Regenerating the locator map
 
