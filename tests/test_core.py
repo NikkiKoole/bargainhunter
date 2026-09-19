@@ -213,6 +213,46 @@ class Export(unittest.TestCase):
             self.assertIn("facet-source", html)
             packed = json.loads((out / "data" / "listings.json").read_text())
             self.assertIn("source", packed["cols"])
+            js = (out / "app.js").read_text(encoding="utf-8")
+            self.assertIn("prettySource", js)
+            self.assertIn("OK Bulgaria", js)
+
+
+class SourceLabels(unittest.TestCase):
+    """Friendly portal names live in the UI, not the scrape path."""
+
+    NAMES = {
+        "franimo": "Franimo",
+        "ok_bulgaria": "OK Bulgaria",
+        "akiyaportal": "Akiya Portal",
+        "holprop": "Holprop",
+        "abruzzopropertyitaly": "Abruzzo Property Italy",
+        "abruzzoruralproperty": "Abruzzo Rural",
+        "centrarium": "Centrarium",
+        "mubawab": "Mubawab",
+        "homege": "home.ge",
+        "bulgarianproperties": "Bulgarian Properties",
+    }
+
+    def test_app_js_maps_known_sources(self):
+        from core.paths import WEB
+        js = (WEB / "app.js").read_text(encoding="utf-8")
+        self.assertIn("if (!r.source) r.source = 'franimo'", js)
+        self.assertIn("function prettySource", js)
+        for key, label in self.NAMES.items():
+            self.assertIn(f"{key}: '{label}'", js)
+
+    def test_prettify_fallback_matches_ui(self):
+        import re
+        def pretty(key):
+            if key in self.NAMES:
+                return self.NAMES[key]
+            return re.sub(r"[_-]+", " ", key).title()
+        self.assertEqual(pretty("franimo"), "Franimo")
+        self.assertEqual(pretty("ok_bulgaria"), "OK Bulgaria")
+        self.assertEqual(pretty("homege"), "home.ge")
+        self.assertEqual(pretty("new_portal_x"), "New Portal X")
+        self.assertEqual(pretty("foo-bar"), "Foo Bar")
 
 
 if __name__ == "__main__":

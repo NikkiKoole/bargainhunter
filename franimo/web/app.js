@@ -41,6 +41,45 @@ const img = u => !u ? '' : (u.startsWith('http') ? u : BASE + u);
 const median = a => { const s = a.filter(x => x != null).sort((x, y) => x - y);
   return s.length ? s[Math.floor(s.length / 2)] : null; };
 
+// Portal keys stay stable in the data; the UI shows a short name. Unknown
+// keys (a future adapter, a typo) get underscores turned into words.
+const SOURCE_NAMES = {
+  franimo: 'Franimo',
+  ok_bulgaria: 'OK Bulgaria',
+  akiyaportal: 'Akiya Portal',
+  holprop: 'Holprop',
+  abruzzopropertyitaly: 'Abruzzo Property Italy',
+  abruzzoruralproperty: 'Abruzzo Rural',
+  centrarium: 'Centrarium',
+  mubawab: 'Mubawab',
+  homege: 'home.ge',
+  bulgarianproperties: 'Bulgarian Properties',
+};
+const SOURCE_ORDER = Object.keys(SOURCE_NAMES);
+
+function prettySource(key) {
+  if (!key || key === '—') return key || '';
+  if (SOURCE_NAMES[key]) return SOURCE_NAMES[key];
+  return String(key).replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Country is optional and only shown when the listing already has it
+// (a `country` column, or raw_fields.country on a full drawer payload).
+function countryOf(r) {
+  if (r.country) return r.country;
+  const raw = r.raw_fields;
+  return (raw && raw.country) || '';
+}
+
+function locHint(r) {
+  return r.dept_nl || r.region || countryOf(r) || '';
+}
+
+function sourceBadge(r) {
+  if (!r.source) return '';
+  return `<span class="src" title="${r.source}">${prettySource(r.source)}</span>`;
+}
+
 // ---------- filter state ----------
 const chosen = { source: new Set(), searches: new Set(), type: new Set(),
                  region: new Set(), dept_nl: new Set(), energy_label: new Set() };
@@ -56,7 +95,8 @@ function passes(r, skip) {
     // listings was the whole cost of typing in the search box.
     if (r._hay === undefined) {
         r._hay = [r.place, r.type, r.dept_nl, r.region, r.description, r.features,
-                  r.agent, r.reference, r.snippet, r.source].filter(Boolean).join(' ').toLowerCase();
+                  r.agent, r.reference, r.snippet, r.source, prettySource(r.source),
+                  countryOf(r)].filter(Boolean).join(' ').toLowerCase();
     }
     if (!terms.every(w => r._hay.includes(w))) return false;
   }
@@ -103,7 +143,8 @@ function readFilters() {
     for (const r of ALL) {
       if (r._hay === undefined) {
         r._hay = [r.place, r.type, r.dept_nl, r.region, r.description, r.features,
-                  r.agent, r.reference, r.snippet, r.source].filter(Boolean).join(' ').toLowerCase();
+                  r.agent, r.reference, r.snippet, r.source, prettySource(r.source),
+                  countryOf(r)].filter(Boolean).join(' ').toLowerCase();
       }
       r._text = terms.every(w => r._hay.includes(w));
     }
@@ -132,19 +173,31 @@ function passes(r, skip) {
 const filtered = () => ALL.filter(r => passes(r));
 
 // ---------- facets ----------
-function facet(key, title, host, limit) {
+function facet(key, title, host, limit, labelOf) {
   const pool = ALL.filter(r => passes(r, key));
   const counts = new Map();
   pool.forEach(r => values(r, key).forEach(v => counts.set(v, (counts.get(v) || 0) + 1)));
-  const items = [...counts].sort((a, b) => b[1] - a[1]);
+  let items = [...counts].sort((a, b) => b[1] - a[1]);
+  if (key === 'source') {
+    items.sort((a, b) => {
+      const ia = SOURCE_ORDER.indexOf(a[0]), ib = SOURCE_ORDER.indexOf(b[0]);
+      const da = ia === -1 ? 999 : ia, db = ib === -1 ? 999 : ib;
+      if (da !== db) return da - db;
+      return prettySource(a[0]).localeCompare(prettySource(b[0]), 'nl');
+    });
+  }
   host.innerHTML = '';
-  const h = el('h4'); h.textContent = title; host.append(h);
+  const h = el('h4');
+  h.textContent = items.length > 1 ? `${title} · ${items.length}` : title;
+  host.append(h);
   const show = host.dataset.expanded === '1' ? items.length : (limit || 8);
   items.slice(0, show).forEach(([v, c]) => {
     const l = el('label'), cb = el('input');
     cb.type = 'checkbox'; cb.checked = chosen[key].has(v);
     cb.onchange = () => { cb.checked ? chosen[key].add(v) : chosen[key].delete(v); render(); };
-    const s = el('span'); s.textContent = v;
+    const label = labelOf ? labelOf(v) : v;
+    const s = el('span'); s.textContent = label;
+    if (labelOf && label !== v) s.title = v;
     const b = el('b'); b.textContent = c;
     l.append(cb, s, b); host.append(l);
   });
@@ -158,8 +211,8 @@ function facet(key, title, host, limit) {
 // ---------- table ----------
 const COLS = [
   { k: 'thumb', t: '', cls: 'thumb', cell: r => r.thumb ? `<img loading="lazy" src="${img(r.thumb)}">` : '' },
-  { k: 'type', t: 'type', cell: r => `${r.type || ''}${r.source ? ` <span class="src">${r.source}</span>` : ''}` },
-  { k: 'place', t: 'plaats', cls: 'place', cell: r => `${r.place || ''} <span class="tag">${r.dept_nl || ''}</span>` },
+  { k: 'type', t: 'type', cell: r => `${r.type || ''} ${sourceBadge(r)}` },
+  { k: 'place', t: 'plaats', cls: 'place', cell: r => `${r.place || ''} <span class="tag">${locHint(r)}</span>` },
   { k: 'price', t: 'prijs', cls: 'num', cell: r => eur(r.price) +
       (r.price_drop ? ` <span class="drop">▼${num(r.price_drop)}</span>` : '') },
   { k: 'eur_m2', t: '€/m²', cls: 'num', cell: r => num(r.eur_m2) },
@@ -228,11 +281,11 @@ function renderGrid(rows) {
       ${r.thumb ? `<img loading="lazy" src="${img(r.thumb)}">` : ''}
       <div class="c"><h3>${r.type || ''} ${r.place || ''}</h3>
       <div class="meta"><span class="price">${eur(r.price)}</span>
-        ${r.source ? `<span class="src">${r.source}</span>` : ''}
+        ${sourceBadge(r)}
         ${r.eur_m2 ? `<span>${num(r.eur_m2)} €/m²</span>` : ''}
         ${r.living_m2 ? `<span>${num(r.living_m2)} m²</span>` : ''}
         ${r.land_m2 ? `<span>${num(r.land_m2)} m² grond</span>` : ''}
-        <span>${r.dept_nl || ''}</span></div></div>
+        ${locHint(r) ? `<span class="geo">${locHint(r)}</span>` : ''}</div></div>
     </div>`).join('');
   g.onclick = e => {
     const c = e.target.closest('.card');
@@ -261,7 +314,7 @@ function renderMap(rows) {
     m.bindPopup(`<div class="pop">
       ${r.thumb ? `<img src="${img(r.thumb)}" alt="">` : ''}
       <b>${r.type || ''} ${r.place || ''}</b>
-      <span class="sub">${r.dept_nl || ''}</span>
+      <span class="sub">${sourceBadge(r)}${locHint(r) ? ' · ' + locHint(r) : ''}</span>
       <span class="p">${eur(r.price)}${r.eur_m2 ? ` · ${num(r.eur_m2)} €/m²` : ''}</span>
       ${r.living_m2 || r.land_m2 ? `<span class="sub">${r.living_m2 ? r.living_m2 + ' m² woning' : ''}${r.living_m2 && r.land_m2 ? ' · ' : ''}${r.land_m2 ? num(r.land_m2) + ' m² terrein' : ''}</span>` : ''}
       <a href="#" onclick="window.__open(${r.id});return false">details →</a>
@@ -349,9 +402,15 @@ async function openDrawer(r) {
     `<div class="fig"><b>${v}</b><span>${label}</span></div>`;
   $('#drawer-body').innerHTML = `
     <h2>${r.type || ''} ${r.place || ''}</h2>
-    <div class="sub">${r.source ? `<span class="src">${r.source}</span> · ` : ''}${r.dept_nl || ''}${r.region ? ' · ' + r.region : ''}
-      ${r.reference ? ' · ref ' + r.reference : ''} · #${r.id}
-      ${r.gone_at ? ` · <b>niet meer op ${r.source || 'de bron'}</b>` : ''}</div>
+    <div class="sub">${[
+        sourceBadge(r),
+        countryOf(r),
+        r.dept_nl,
+        r.region && r.region !== r.dept_nl && r.region !== countryOf(r) ? r.region : '',
+        r.reference ? 'ref ' + r.reference : '',
+        '#' + r.id,
+        r.gone_at ? `<b>niet meer op ${prettySource(r.source) || 'de bron'}</b>` : '',
+      ].filter(Boolean).join(' · ')}</div>
     <div class="figs">
       ${fig(eur(r.price), 'prijs')}
       ${fig(r.eur_m2 ? num(r.eur_m2) : null, '€/m²')}
@@ -365,7 +424,7 @@ async function openDrawer(r) {
     ${r.price_drop ? `<p class="drop">prijs verlaagd met ${eur(r.price_drop)}
        ${r.first_price ? `(was ${eur(r.old_price || r.first_price)})` : ''}</p>` : ''}
     ${locator(r)}
-    <a class="open" href="${r.url}" target="_blank" rel="noopener">open op ${r.source || 'bron'} ↗</a>
+    <a class="open" href="${r.url}" target="_blank" rel="noopener">open op ${prettySource(r.source) || 'bron'} ↗</a>
     ${r.features ? `<div class="feat">${r.features}</div>` : ''}
     <div class="desc">${(r.description || r.snippet || '').replace(/</g, '&lt;')}</div>
     <div class="shots">${(r.photos || []).map(p =>
@@ -397,7 +456,7 @@ function render() {
     <b>${rows.filter(r => r.price_drop).length}</b> verlaagd` +
     (nodetail ? ` · <span title="detailpagina nog niet opgehaald">${nodetail} zonder m²</span>` : '');
 
-  facet('source', 'bron', $('#facet-source'));
+  facet('source', 'bron', $('#facet-source'), 20, prettySource);
   facet('searches', 'gebied', $('#facet-area'));
   facet('type', 'type', $('#facet-type'));
   facet('region', 'regio', $('#facet-region'));
