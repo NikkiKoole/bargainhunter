@@ -100,5 +100,47 @@
     "note": "Same /listings form, prefecture=akita (~1,183 listings / 50 pages). Parked rural slice; run by name. Hub pages (/akiya-in-akita) also parse but omit listing_id, so this path is preferred.",
     "path": "/listings?prefecture=akita",
     "enabled": false
+  },
+  "hp-es-houses-100k": {
+    "source": "holprop",
+    "label": "Holprop Spain houses under €100k",
+    "note": "holprop.com house filter /sale/pt/villa-house/scr/spain/price/100000/. Verified 2026-09-19: 68 listings / 2 pages. Small seed — the only holprop search enabled by default.",
+    "path": "/sale/pt/villa-house/scr/spain/price/100000/",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "hp-bg-houses-100k": {
+    "source": "holprop",
+    "label": "Holprop Bulgaria houses under €100k",
+    "note": "Same house+price URL shape for Bulgaria. Verified 2026-09-19: 1,670 listings / 43 pages. Parked (volume); run by name. Alternate unfiltered list /sale/property/bulgaria/ also parses.",
+    "path": "/sale/pt/villa-house/scr/bulgaria/price/100000/",
+    "enabled": false,
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "hp-pt-houses-100k": {
+    "source": "holprop",
+    "label": "Holprop Portugal houses under €100k",
+    "note": "Verified 2026-09-19: 317 listings. Parked; run by name.",
+    "path": "/sale/pt/villa-house/scr/portugal/price/100000/",
+    "enabled": false
+  },
+  "hp-gr-houses-100k": {
+    "source": "holprop",
+    "label": "Holprop Greece houses under €100k",
+    "note": "Verified 2026-09-19: 379 listings. Parked; run by name.",
+    "path": "/sale/pt/villa-house/scr/greece/price/100000/",
+    "enabled": false
+  },
+  "hp-it-houses-100k": {
+    "source": "holprop",
+    "label": "Holprop Italy houses under €100k",
+    "note": "Italy is usable on Holprop: /sale/pt/villa-house/scr/italy/price/100000/ had 319 houses on 2026-09-19 (unfiltered /sale/villa-house/italy/ is ~2,787). Parked; run by name.",
+    "path": "/sale/pt/villa-house/scr/italy/price/100000/",
+    "enabled": false
   }
 }
