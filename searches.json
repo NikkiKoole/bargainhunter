@@ -200,5 +200,29 @@
     "note": "Unfiltered /en/montenegro/sale/houses/ — same 826 listings as lowprice, default sort. Parked; run by name. EN first paint can show USD; prefer the lowprice path (EUR) plus skip.above.",
     "path": "/en/montenegro/sale/houses/",
     "enabled": false
+  },
+  "mw-ma-houses-100k": {
+    "source": "mubawab",
+    "label": "Mubawab Morocco houses ≤ ~€100k",
+    "note": "mubawab.ma/en house list with the site's own MAD colon filter /en/sc/houses-for-sale:pr:0-1100000. Verified 2026-09-19: 375 results / 12 pages (32 per page). Query-string ?maxPrice= is ignored; :mp:1100000 is a no-op. 1,100,000 MAD ≈ €100.9k at the documented 10.9 MAD/EUR (Sep 2026 market ~10.91). skip.above is EUR 100000. PRICE_ASC does not actually sort (premium stays first) so we crawl every page of this band. Morocco: titled urban/peri-urban only — never agricultural land without a lawyer. Anonymous datacenter GET works (no Cloudflare challenge).",
+    "path": "/en/sc/houses-for-sale:pr:0-1100000",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "mw-ma-houses-150k": {
+    "source": "mubawab",
+    "label": "Mubawab Morocco houses ≤ ~€150k",
+    "note": "Same :pr: filter, 0–1,600,000 MAD (~€147k at 10.9). Verified 2026-09-19: 701 results. Parked; run by name.",
+    "path": "/en/sc/houses-for-sale:pr:0-1600000",
+    "enabled": false
+  },
+  "mw-ma-houses": {
+    "source": "mubawab",
+    "label": "Mubawab Morocco houses (all prices)",
+    "note": "Unfiltered /en/sc/houses-for-sale — 2,017 listings / 64 pages on 2026-09-19. Parked (volume); run by name. Prefer the :pr: band plus skip.above.",
+    "path": "/en/sc/houses-for-sale",
+    "enabled": false
   }
 }

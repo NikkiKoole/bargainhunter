@@ -7,8 +7,9 @@ houses), [Akiya Portal](https://akiyaportal.com/) (English listings of
 vacant houses in Japan), [Holprop](https://www.holprop.com/) (multi-country
 foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com/)
 (English Abruzzo/Molise agency), [Abruzzo Rural Property](https://www.abruzzoruralproperty.com/)
-(second English Abruzzo/Molise agency), and [Centrarium](https://centrarium.com/)
-(English Montenegro / Balkans houses). The scrape → SQLite → static page pipeline is
+(second English Abruzzo/Molise agency), [Centrarium](https://centrarium.com/)
+(English Montenegro / Balkans houses), and [Mubawab](https://www.mubawab.ma/en)
+(English/French Morocco houses). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -47,11 +48,12 @@ python3 -m holprop.scrape          # enabled Holprop searches
 python3 -m abruzzopropertyitaly.scrape  # enabled Abruzzo Property Italy searches
 python3 -m abruzzoruralproperty.scrape  # enabled Abruzzo Rural Property searches
 python3 -m centrarium.scrape       # enabled Centrarium searches
+python3 -m mubawab.scrape          # enabled Mubawab searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo or Centrarium.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium or Mubawab.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -79,8 +81,8 @@ sqlite file so you do not write `db/franimo.db`.
 Holprop is blocked from datacenter IPs (Cloudflare). The one-host-at-a-time
 checklist is `PLAYBOOK.md`: franimo refresh optional → Bulgaria → Japan →
 Holprop (home IP) → both Abruzzo 100k searches → Centrarium
-`ct-me-houses-100k` (5s crawl-delay) → export last, and only when
-you want Pages updated.
+`ct-me-houses-100k` (5s crawl-delay) → Mubawab `mw-ma-houses-100k` →
+export last, and only when you want Pages updated.
 
 ## Publishing a static copy
 
@@ -190,6 +192,8 @@ The current set:
 | `arp-houses-150k` | same site, €150k band |  | parked |
 | `ct-me-houses-100k` | **Centrarium Montenegro houses ≤ €100k** | ~43 | active |
 | `ct-me-houses` | same site, all 826 houses (no price skip) |  | parked |
+| `mw-ma-houses-100k` | **Mubawab Morocco houses ≤ ~€100k** | ~375 | active |
+| `mw-ma-houses-150k` / `mw-ma-houses` | same site, ~€150k band / all 2,017 houses |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -434,13 +438,65 @@ unfiltered `/houses/` first paint can show USD — prefer the lowprice path.
 List cards give living m² / rooms / bedrooms; land and lat/lon come from
 the detail page (plot line in the description, `addr_lat` / OSM).
 
+## Mubawab
+
+[mubawab.ma/en](https://www.mubawab.ma/en) is Morocco's large EN/FR
+property portal. The seed is houses. Public list/detail pages only.
+Anonymous datacenter GET works (no Cloudflare challenge on a 2026-09-19
+probe). `robots.txt` disallows login, cms, backoffice, `ads/b` and
+`/*:` (an indexer rule for the colon filter/pager). The site's own
+pager is `:p:N`; we follow it. Never hit `/en/p/` project teasers.
+
+```sh
+python3 -m mubawab.scrape mw-ma-houses-100k --no-details --max-pages 1   # trial
+python3 -m mubawab.scrape mw-ma-houses-100k --no-details                 # all 12 list pages
+python3 -m mubawab.scrape mw-ma-houses-100k --detail-limit 20            # then details
+python3 -m mubawab.scrape mw-ma-houses-150k --no-details --max-pages 1   # parked 150k, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`).
+Default gap is 0.6s and default workers is 1 — be kind; do not run this
+in parallel with another scrape of the same host.
+
+The house list is `/en/sc/houses-for-sale`. The site's own **MAD**
+price filter is a colon path, not a query string:
+
+`/en/sc/houses-for-sale:pr:0-1100000`
+
+Verified 2026-09-19: `?maxPrice=1100000` and `:mp:1100000` leave the
+unfiltered 2,017. `:pr:0-1100000` returns **375** houses / 12 pages
+(32 per page). `:st:PRICE_ASC` is recognised in the URL but does **not**
+sort (premium cards stay first), so we crawl every page of the band.
+
+| search | MAD cap | listings | |
+|---|---|---|---|
+| `mw-ma-houses-100k` (enabled) | 1,100,000 | 375 | ~€100.9k |
+| `mw-ma-houses-150k` (parked) | 1,600,000 | 701 | ~€147k |
+| `mw-ma-houses` (parked) | none | 2,017 | 64 pages |
+
+1,100,000 MAD is ~€100.9k at the documented 10.9 MAD/EUR (Sep 2026
+market ~10.91 — not a live ECB / BAM feed). `skip.above` is EUR 100000.
+Some cards already print EUR (`85,000 EUR`); those are stored as the
+portal states them. DH cards are converted and the original sits in
+`raw_fields`.
+
+Detail ids are numeric (`/en/a/8418668/house-for-sale-sefrou`).
+`external_id` is that id. List cards give living m² / pièces / rooms /
+baths; land (`Plot surface`) and lat/lon come from the detail page.
+
+**Ownership.** Morocco: titled urban / peri-urban only. Do not buy
+agricultural land without a Moroccan lawyer. The portal lists
+unregistered houses (administrative act) next to titled ones — that is
+in the copy, not a filter we apply.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
 `ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk; `akiyaportal/` scrapes
 akiyaportal.com; `holprop/` scrapes holprop.com; `abruzzopropertyitaly/`
 scrapes abruzzopropertyitaly.com; `abruzzoruralproperty/` scrapes
-abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com. Each CLI
+abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com;
+`mubawab/` scrapes mubawab.ma. Each CLI
 only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
@@ -462,6 +518,7 @@ holprop/            holprop.com adapter + CLI
 abruzzopropertyitaly/  abruzzopropertyitaly.com adapter + CLI
 abruzzoruralproperty/  abruzzoruralproperty.com adapter + CLI
 centrarium/         centrarium.com adapter + CLI
+mubawab/            mubawab.ma adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
