@@ -18,7 +18,8 @@ checklist.
 6. Centrarium `ct-me-houses-100k` (5s crawl-delay; ~43 houses)
 7. Mubawab `mw-ma-houses-100k` (MAD `:pr:0-1100000`; ~375 houses)
 8. home.ge `hg-ge-houses-100k` (EUR GET filter; ~84 houses)
-9. **only then** export, and only when you want Pages updated
+9. Bulgarian Properties `bp-bg-under-10k` (static under-£10k browse; ~37)
+10. **only then** export, and only when you want Pages updated
 
 ## Commands
 
@@ -61,6 +62,11 @@ python3 -m mubawab.scrape mw-ma-houses-100k --detail-limit 20
 # 8. home.ge — EUR GET filter (~84 / 2 pages). Non-ag freehold only.
 python3 -m homege.scrape hg-ge-houses-100k --no-details
 python3 -m homege.scrape hg-ge-houses-100k
+
+# 9. Bulgarian Properties — static under-£10k browse (~37 / 2 pages).
+#    robots Disallow search query paths; do not use /Search/index.php.
+python3 -m bulgarianproperties.scrape bp-bg-under-10k --no-details
+python3 -m bulgarianproperties.scrape bp-bg-under-10k
 ```
 
 Look before you publish:
@@ -79,7 +85,9 @@ seed is also small (~43); keep the 5s gap. Mubawab's enabled seed is
 ~375 / 12 pages; `PRICE_ASC` does not actually sort, so do not stop
 early — finish the `:pr:` band. home.ge's enabled seed is ~84 / 2
 pages; drop the cap. First GET can bounce on a session cookie — the
-Fetcher retries.
+Fetcher retries. Bulgarian Properties' enabled seed is ~37 / 2
+pages; drop the cap. Browse URLs only — `*page=` and `/Search/` are
+robots Disallow.
 
 **Never delete `cache/`.** Every fetched page is gzipped, keyed by sha1(full
 URL). `--redetail` re-parses from disk with zero requests. Do not move cache
@@ -103,7 +111,8 @@ must not become the published payload.
 
 The UI is already multi-source: source badge + **bron** facet. One export
 packs every row in the database — franimo, Bulgaria, Japan, Holprop, both
-Abruzzo agencies, Centrarium, Mubawab, home.ge. There is no per-source publish step.
+Abruzzo agencies, Centrarium, Mubawab, home.ge, Bulgarian Properties.
+There is no per-source publish step.
 
 Export when you want https://mipolai.com/bargainhunter/ updated, not after
 every scrape:
@@ -134,6 +143,8 @@ want it in the default pass.
 | `mw-ma-houses` | mubawab | all 2,017 Morocco houses, no price filter |
 | `hg-ge-houses-150k` | homege | wider EUR band (136 listings) |
 | `hg-ge-houses` | homege | all-price house-for-sale category (7 pages) |
+| `bp-bg-rural-houses` | bulgarianproperties | 830 rural houses / 28 pages |
+| `bp-bg-houses` | bulgarianproperties | all 1,173 houses / 40 pages |
 
 ```sh
 python3 -m ok_bulgaria.scrape bg-houses-100k --no-details
@@ -146,6 +157,8 @@ python3 -m mubawab.scrape mw-ma-houses-150k --no-details
 python3 -m mubawab.scrape mw-ma-houses --no-details
 python3 -m homege.scrape hg-ge-houses-150k --no-details
 python3 -m homege.scrape hg-ge-houses --no-details
+python3 -m bulgarianproperties.scrape bp-bg-rural-houses --no-details
+python3 -m bulgarianproperties.scrape bp-bg-houses --no-details
 ```
 
 `jp-akita` and `api-houses-50k` are also parked (regional / narrower). Same

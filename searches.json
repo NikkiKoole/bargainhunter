@@ -248,5 +248,29 @@
     "note": "Unfiltered /en/saxlebi-agarakebi/iyideba-saxlebi-agarakebi.html — 7 pages on 2026-09-19. Parked; run by name. Prefer the euro price band plus skip.above.",
     "path": "/en/saxlebi-agarakebi/iyideba-saxlebi-agarakebi.html",
     "enabled": false
+  },
+  "bp-bg-under-10k": {
+    "source": "bulgarianproperties",
+    "label": "Bulgarian Properties under £10k",
+    "note": "bulgarianproperties.com static browse /properties-in-bulgaria-under-ten-thousand-pounds.html — the site's own under-£10k bucket. Verified 2026-09-19: 37 results / 2 pages (30 per page). robots.txt Disallow /*search, *minprice=, *maxprice=, *page= — do not use /Search/index.php or query-string filters. Pagination is a path suffix (…pounds1.html); never index0.html. Display currency is EUR (€ 10 900 / JSON-LD EUR) with a JS £/$ switcher; we store euro and keep GBP in raw_fields (dual-display ~1.163 EUR/GBP). skip.above is EUR 15000 (slack over £10k ≈ €11.6k). Complements ok_bulgaria (different inventory). Anonymous datacenter GET works (Cloudflare present, no challenge).",
+    "path": "/properties-in-bulgaria-under-ten-thousand-pounds.html",
+    "skip": {
+      "priceless": true,
+      "above": 15000
+    }
+  },
+  "bp-bg-rural-houses": {
+    "source": "bulgarianproperties",
+    "label": "Bulgarian Properties rural houses",
+    "note": "Static browse /rural_houses.html. Verified 2026-09-19: 830 houses / 28 pages. Mixed prices (page 1 €22k–€150k). Parked (volume); run by name. Same path-suffix pager (rural_houses1.html).",
+    "path": "/rural_houses.html",
+    "enabled": false
+  },
+  "bp-bg-houses": {
+    "source": "bulgarianproperties",
+    "label": "Bulgarian Properties houses (all prices)",
+    "note": "Unfiltered /Houses_in_Bulgaria/index.html — 1,173 listings / 40 pages on 2026-09-19. Parked (volume); run by name. Pager is /indexN.html (page 1 is index.html; never index0 — robots Disallow). Prefer the under-£10k browse plus skip.above.",
+    "path": "/Houses_in_Bulgaria/index.html",
+    "enabled": false
   }
 }

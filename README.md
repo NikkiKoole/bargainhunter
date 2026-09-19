@@ -9,8 +9,9 @@ foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com
 (English Abruzzo/Molise agency), [Abruzzo Rural Property](https://www.abruzzoruralproperty.com/)
 (second English Abruzzo/Molise agency), [Centrarium](https://centrarium.com/)
 (English Montenegro / Balkans houses), [Mubawab](https://www.mubawab.ma/en)
-(English/French Morocco houses), and [home.ge](https://www.home.ge/en/)
-(English Georgia houses). The scrape → SQLite → static page pipeline is
+(English/French Morocco houses), [home.ge](https://www.home.ge/en/)
+(English Georgia houses), and [Bulgarian Properties](https://www.bulgarianproperties.com/)
+(English Bulgaria houses). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -51,11 +52,12 @@ python3 -m abruzzoruralproperty.scrape  # enabled Abruzzo Rural Property searche
 python3 -m centrarium.scrape       # enabled Centrarium searches
 python3 -m mubawab.scrape          # enabled Mubawab searches
 python3 -m homege.scrape           # enabled home.ge searches
+python3 -m bulgarianproperties.scrape  # enabled Bulgarian Properties searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab or home.ge.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge or Bulgarian Properties.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -85,6 +87,7 @@ checklist is `PLAYBOOK.md`: franimo refresh optional → Bulgaria → Japan →
 Holprop (home IP) → both Abruzzo 100k searches → Centrarium
 `ct-me-houses-100k` (5s crawl-delay) → Mubawab `mw-ma-houses-100k` →
 home.ge `hg-ge-houses-100k` →
+Bulgarian Properties `bp-bg-under-10k` →
 export last, and only when you want Pages updated.
 
 ## Publishing a static copy
@@ -199,6 +202,8 @@ The current set:
 | `mw-ma-houses-150k` / `mw-ma-houses` | same site, ~€150k band / all 2,017 houses |  | parked |
 | `hg-ge-houses-100k` | **home.ge Georgia houses ≤ €100k** | ~84 | active |
 | `hg-ge-houses-150k` / `hg-ge-houses` | same site, €150k band / all-price sale category |  | parked |
+| `bp-bg-under-10k` | **Bulgarian Properties under £10k** | ~37 | active |
+| `bp-bg-rural-houses` / `bp-bg-houses` | same site, 830 rural houses / all 1,173 houses |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -551,6 +556,58 @@ generally restricted. The seed is houses only — do not scrape
 `/miwis-nakveti/` land without treating the ag-land ban as a hard
 caveat. That is in the copy, not a filter we apply.
 
+## Bulgarian Properties
+
+[bulgarianproperties.com](https://www.bulgarianproperties.com/) is an
+English-language A–B tier foreigner agency (different stock from
+OK Bulgaria). Public browse/category pages only. Anonymous datacenter
+GET works (Cloudflare is present but does not challenge).
+`robots.txt` Disallow includes `/*search`, `*minprice=`, `*maxprice=`,
+`*page=`, `*ID=`, `/*srtby=`, `/*hw_page`, `/*index0.html` — never use
+`/Search/index.php` or a query-string price filter. Static category
+URLs (`rural_houses.html`, the under-£10k browse) are allowed.
+
+```sh
+python3 -m bulgarianproperties.scrape bp-bg-under-10k --no-details --max-pages 1   # trial
+python3 -m bulgarianproperties.scrape bp-bg-under-10k --no-details                 # both list pages
+python3 -m bulgarianproperties.scrape bp-bg-under-10k                             # then details
+python3 -m bulgarianproperties.scrape bp-bg-rural-houses --no-details --max-pages 1  # parked rural, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`).
+Default gap is 0.6s and default workers is 1 — be kind; do not run this
+in parallel with another scrape of the same host.
+
+The enabled seed is the site's own under-£10k browse page:
+
+`/properties-in-bulgaria-under-ten-thousand-pounds.html`
+
+Verified 2026-09-19: **37** listings / 2 pages (30 per page). Pagination
+is a **path suffix** (`…pounds1.html`); category lists use
+`/indexN.html`. Page 1 omits the suffix so cache keys match the URL the
+site serves. Never emit `index0.html` (robots Disallow).
+
+| search | listings | pages | |
+|---|---|---|---|
+| `bp-bg-under-10k` (enabled) | 37 | 2 | under £10k browse |
+| `bp-bg-rural-houses` (parked) | 830 | 28 | `/rural_houses.html` |
+| `bp-bg-houses` (parked) | 1,173 | 40 | `/Houses_in_Bulgaria/index.html` |
+
+Display currency is **EUR** (`€ 10 900` / JSON-LD `priceCurrency: EUR`).
+A JS switcher also prints pounds and dollars (`£ 9 375` / `$ 12 512`
+on the same €10,900 card). We store `price` + `currency=EUR` as the
+portal states them and keep £ / $ in `raw_fields`. If a card has only
+pounds, we convert with a documented fixed rate
+(`bulgarianproperties/fx.py`, ≈1.163 EUR/GBP — the portal's own dual
+display, not a live ECB feed).
+
+Detail ids are `ADxxxxxBG`
+(`/Houses_in_Bulgaria/AD91080BG_House_for_sale_near_Pavlikeni.html`).
+`external_id` is that id; the agency ref (`VT 91080`) is `reference`.
+List cards give living m² / garden; lat/lon come from the detail-page
+map embed. Reserved / sold cards stay in (flagged in `raw_fields`).
+Complements ok_bulgaria — different agency stock.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
@@ -559,7 +616,8 @@ akiyaportal.com; `holprop/` scrapes holprop.com; `abruzzopropertyitaly/`
 scrapes abruzzopropertyitaly.com; `abruzzoruralproperty/` scrapes
 abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com;
 `mubawab/` scrapes mubawab.ma;
-`homege/` scrapes home.ge. Each CLI
+`homege/` scrapes home.ge;
+`bulgarianproperties/` scrapes bulgarianproperties.com. Each CLI
 only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
@@ -583,6 +641,7 @@ abruzzoruralproperty/  abruzzoruralproperty.com adapter + CLI
 centrarium/         centrarium.com adapter + CLI
 mubawab/            mubawab.ma adapter + CLI
 homege/             home.ge adapter + CLI
+bulgarianproperties/  bulgarianproperties.com adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
