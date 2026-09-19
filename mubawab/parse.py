@@ -21,10 +21,13 @@ from __future__ import annotations
 import json
 import math
 import re
+import warnings
 from typing import Any
 from urllib.parse import urljoin, urlparse, urlunparse
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 from .fx import FX_SOURCE, MAD_PER_EUR, MAD_TO_EUR, mad_to_eur
 from .http import BASE
@@ -528,6 +531,9 @@ def parse_detail(html: str, url: str) -> dict[str, Any]:
             "portal copy mentions title/registration — "
             "Morocco: titled urban/peri-urban only; never ag land without a lawyer"
         )
+    blob = " ".join(x for x in (desc, ld.get("name"), features.get("Type of property")) if x)
+    if re.search(r"\bfor rent\b|\bà louer\b", blob, re.I):
+        raw["maybe_rental"] = True
 
     out: dict[str, Any] = {
         "source": SOURCE,

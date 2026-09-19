@@ -185,6 +185,32 @@ class DetailParser(unittest.TestCase):
         self.assertAlmostEqual(d["lon"], -4.014765603898976)
         self.assertIn("Terrace", d["features"] or "")
 
+    def test_rental_copy_is_flagged_not_dropped(self):
+        html = """
+        <html><head>
+        <script type="application/ld+json">{"@type":"RealEstateListing","url":
+        "https://www.mubawab.ma/en/a/8395905/villa-for-rent","name":"Villa for rent",
+        "description":"LUXURY NEW VILLA FOR RENT AT L'ORANGE",
+        "offers":{"price":100000,"priceCurrency":"MAD"},
+        "itemOffered":{"address":{"addressLocality":"Rabat"},
+        "numberOfRooms":10,"numberOfBedrooms":6,"numberOfBathroomsTotal":7,
+        "floorSize":{"value":1000,"unitCode":"MTR"}}}</script>
+        </head><body>
+        <h1 class="searchTitle">Villa for rent</h1>
+        <div class="mainInfoProp"><h3 class="orangeTit">100,000 DH</h3>
+        <h3 class="greyTit">Agdal, Rabat</h3></div>
+        <div class="blockProp"><h1 class="searchTitle">Villa for rent</h1>
+        <p>LUXURY NEW VILLA FOR RENT AT L'ORANGE</p></div>
+        </body></html>
+        """
+        d = parse_detail(
+            html,
+            "https://www.mubawab.ma/en/a/8395905/villa-for-rent",
+        )
+        self.assertEqual(d["external_id"], "8395905")
+        self.assertEqual(d["price"], 9174)
+        self.assertTrue(d["raw_fields"].get("maybe_rental"))
+
 
 class Store(unittest.TestCase):
     def test_list_upsert_then_detail(self):
