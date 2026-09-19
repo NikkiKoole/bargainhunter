@@ -232,6 +232,8 @@ class SourceLabels(unittest.TestCase):
         "mubawab": "Mubawab",
         "homege": "home.ge",
         "bulgarianproperties": "Bulgarian Properties",
+        "domaza": "Domaza",
+        "lefigaro": "Le Figaro",
     }
 
     def test_app_js_maps_known_sources(self):
