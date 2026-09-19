@@ -1,7 +1,8 @@
 # When-you're-home scrape playbook
 
-Home IP is available. Holprop will Cloudflare-challenge a datacenter; the
-other hosts are kinder. One host at a time — the rate limit is process-wide,
+Home IP is available. Holprop and Le Figaro Immobilier will
+Cloudflare-challenge a datacenter; the other hosts are kinder. One host
+at a time — the rate limit is process-wide,
 so two scrapers at the same site double the request rate. Do not export until
 the scrapes you want are in `db/franimo.db`.
 
@@ -20,7 +21,8 @@ checklist.
 8. home.ge `hg-ge-houses-100k` (EUR GET filter; ~84 houses)
 9. Bulgarian Properties `bp-bg-under-10k` (static under-£10k browse; ~37)
 10. Domaza `dz-me-houses` (enable AL / RS / GE if you want them)
-11. **only then** export, and only when you want Pages updated
+11. Le Figaro Immobilier `lf-23-houses-150k` (home IP; Cloudflare)
+12. **only then** export, and only when you want Pages updated
 
 ## Commands
 
@@ -76,6 +78,14 @@ python3 -m domaza.scrape dz-me-houses --detail-limit 200
 # python3 -m domaza.scrape dz-al-houses --no-details
 # python3 -m domaza.scrape dz-rs-houses --no-details
 # python3 -m domaza.scrape dz-ge-houses --no-details
+
+# 11. Le Figaro Immobilier — home IP only. Datacenter gets Cloudflare.
+python3 -m lefigaro.scrape lf-23-houses-150k --no-details
+python3 -m lefigaro.scrape lf-23-houses-150k --detail-limit 200
+# parked dept / facets, by name (or flip "enabled" in searches.json first):
+# python3 -m lefigaro.scrape lf-58-houses-150k --no-details
+# python3 -m lefigaro.scrape lf-23-petit-prix --no-details
+# python3 -m lefigaro.scrape lf-23-travaux --no-details
 ```
 
 Look before you publish:
@@ -96,7 +106,10 @@ early — finish the `:pr:` band. home.ge's enabled seed is ~84 / 2
 pages; drop the cap. First GET can bounce on a session cookie — the
 Fetcher retries. Bulgarian Properties' enabled seed is ~37 / 2
 pages; drop the cap. Browse URLs only — `*page=` and `/Search/` are
-robots Disallow.
+robots Disallow. Le Figaro's enabled seed is the Creuse house SEO
+path (~1 125 / 47 pages, mixed prices); `skip.above` is EUR 150000.
+Home IP only — datacenter is Cloudflare-blocked. Do not seed a
+France-wide list (page 100 hard stop).
 
 **Never delete `cache/`.** Every fetched page is gzipped, keyed by sha1(full
 URL). `--redetail` re-parses from disk with zero requests. Do not move cache
@@ -121,7 +134,7 @@ must not become the published payload.
 The UI is already multi-source: source badge + **bron** facet. One export
 packs every row in the database — franimo, Bulgaria, Japan, Holprop, both
 Abruzzo agencies, Centrarium, Mubawab, home.ge, Bulgarian Properties,
-Domaza. There is no per-source publish step.
+Domaza, Le Figaro Immobilier. There is no per-source publish step.
 
 Export when you want https://mipolai.com/bargainhunter/ updated, not after
 every scrape:
@@ -155,6 +168,9 @@ want it in the default pass.
 | `bp-bg-rural-houses` | bulgarianproperties | 830 rural houses / 28 pages |
 | `bp-bg-houses` | bulgarianproperties | all 1,173 houses / 40 pages |
 | `dz-al-houses` / `dz-rs-houses` / `dz-ge-houses` | domaza | thin; .com EN leftover foreign cards |
+| `lf-58-houses-150k` | lefigaro | Nièvre maisons, same €150k skip |
+| `lf-23-petit-prix` / `lf-23-travaux` | lefigaro | Creuse `?option=` facets; confirm on a home IP |
+| `lf-france-houses` | lefigaro | France-wide maisons — page 100 hard stop |
 
 ```sh
 python3 -m ok_bulgaria.scrape bg-houses-100k --no-details
@@ -170,6 +186,8 @@ python3 -m homege.scrape hg-ge-houses --no-details
 python3 -m bulgarianproperties.scrape bp-bg-rural-houses --no-details
 python3 -m bulgarianproperties.scrape bp-bg-houses --no-details
 python3 -m domaza.scrape dz-rs-houses --no-details
+python3 -m lefigaro.scrape lf-58-houses-150k --no-details
+python3 -m lefigaro.scrape lf-23-petit-prix --no-details
 ```
 
 `jp-akita` and `api-houses-50k` are also parked (regional / narrower). Same

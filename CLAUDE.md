@@ -3,11 +3,13 @@
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
 Akiya Portal, Holprop, Abruzzo Property Italy, Abruzzo Rural Property,
-Centrarium, Mubawab, home.ge, Bulgarian Properties, and Domaza.
+Centrarium, Mubawab, home.ge, Bulgarian Properties, Domaza, and
+Le Figaro Immobilier.
 Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
-to get wrong. Home-IP checklist (Holprop cannot run from a datacenter):
+to get wrong. Home-IP checklist (Holprop and Le Figaro Immobilier
+cannot run from a datacenter):
 `PLAYBOOK.md`.
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
@@ -26,6 +28,7 @@ python3 -m mubawab.scrape                 # 1h. Mubawab Morocco (separate proces
 python3 -m homege.scrape                  # 1i. home.ge Georgia (separate process)
 python3 -m bulgarianproperties.scrape     # 1j. Bulgarian Properties (separate process)
 python3 -m domaza.scrape                  # 1k. Domaza (separate process)
+python3 -m lefigaro.scrape                # 1l. Le Figaro Immobilier — home IP only (Cloudflare)
 python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -43,8 +46,8 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
 OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy,
-Abruzzo Rural Property, Mubawab, home.ge, Bulgarian Properties and
-Domaza default to 0.6s / 1 worker. Centrarium defaults to 5s / 1 worker
+Abruzzo Rural Property, Mubawab, home.ge, Bulgarian Properties,
+Domaza and Le Figaro Immobilier default to 0.6s / 1 worker. Centrarium defaults to 5s / 1 worker
 (`robots.txt` Crawl-delay: 5).
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
@@ -80,7 +83,8 @@ experiments at `--db db/scratch.db` so a trial cannot trash the real file.
 (e.g. `hg-ge-houses-100k`);
 `python3 -m bulgarianproperties.scrape` only runs `bulgarianproperties`
 (e.g. `bp-bg-under-10k`);
-`python3 -m domaza.scrape` only runs `domaza` (e.g. `dz-me-houses`).
+`python3 -m domaza.scrape` only runs `domaza` (e.g. `dz-me-houses`);
+`python3 -m lefigaro.scrape` only runs `lefigaro` (e.g. `lf-23-houses-150k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -148,6 +152,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, price, currency, living_m2, land_m2
   FROM listings WHERE source='domaza' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, dept_fr, price, currency, living_m2, land_m2
+  FROM listings WHERE source='lefigaro' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -181,7 +189,7 @@ the browser, not stored, so a published build doesn't go stale.
 
 `ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly`,
 `abruzzoruralproperty`, `centrarium`, `mubawab`, `homege`,
-`bulgarianproperties` and `domaza` are in.
+`bulgarianproperties`, `domaza` and `lefigaro` are in.
 Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
@@ -294,6 +302,19 @@ house filter (~100 / 5 pages). Albania / Serbia / Georgia are parked
 filter URLs expire — do not seed them. `_pricefrom` / `?priceto=` are
 ignored. Detail ids are numeric (`-17-8687837-p/`). 0.000 lat/lon
 means not stated.
+
+Le Figaro Immobilier displays EUR on FR department SEO lists
+(`37 500 €`; JSON-LD `priceCurrency: EUR`). The seed is
+`/annonces/immobilier-vente-maison-creuse.html` — Creuse houses,
+not a price query (`?priceMax=` was unreliable). Archive 2026:
+1 125 maisons / ~47 pages, mixed prices on page 1. `skip.above`
+is EUR 150000. Pagination is `?page=N` and stops at page 100.
+`?option=petit_prix` / `?option=travaux` are parked until a
+home-IP run confirms them. Detail ids are numeric
+(`/annonces/annonce-103112502.html`). Datacenter GET is
+Cloudflare-blocked — home IP only, same class of wall as Holprop.
+Complements franimo (domestic FR agency/particulier stock);
+overlap is expected — store `source=lefigaro`, do not merge.
 
 ## Regenerating the locator map
 

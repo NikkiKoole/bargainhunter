@@ -11,8 +11,10 @@ foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com
 (English Montenegro / Balkans houses), [Mubawab](https://www.mubawab.ma/en)
 (English/French Morocco houses), [home.ge](https://www.home.ge/en/)
 (English Georgia houses), [Bulgarian Properties](https://www.bulgarianproperties.com/)
-(English Bulgaria houses), and [Domaza](https://www.domaza.com/)
-(Balkans multi-country portal). The scrape → SQLite → static page pipeline is
+(English Bulgaria houses), [Domaza](https://www.domaza.com/)
+(Balkans multi-country portal), and
+[Le Figaro Immobilier](https://immobilier.lefigaro.fr/)
+(domestic French agency/particulier stock). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -55,11 +57,12 @@ python3 -m mubawab.scrape          # enabled Mubawab searches
 python3 -m homege.scrape           # enabled home.ge searches
 python3 -m bulgarianproperties.scrape  # enabled Bulgarian Properties searches
 python3 -m domaza.scrape           # enabled Domaza searches
+python3 -m lefigaro.scrape         # enabled Le Figaro Immobilier searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge, Bulgarian Properties or Domaza.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge, Bulgarian Properties, Domaza or Le Figaro.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -84,13 +87,15 @@ sqlite file so you do not write `db/franimo.db`.
 
 ## When you're home
 
-Holprop is blocked from datacenter IPs (Cloudflare). The one-host-at-a-time
+Holprop and Le Figaro Immobilier are blocked from datacenter IPs
+(Cloudflare). The one-host-at-a-time
 checklist is `PLAYBOOK.md`: franimo refresh optional → Bulgaria → Japan →
 Holprop (home IP) → both Abruzzo 100k searches → Centrarium
 `ct-me-houses-100k` (5s crawl-delay) → Mubawab `mw-ma-houses-100k` →
 home.ge `hg-ge-houses-100k` →
 Bulgarian Properties `bp-bg-under-10k` →
 Domaza `dz-me-houses` →
+Le Figaro Immobilier `lf-23-houses-150k` (home IP; Cloudflare) →
 export last, and only when you want Pages updated.
 
 ## Publishing a static copy
@@ -661,6 +666,66 @@ ECB feed). 0.000 lat/lon on a card means "not stated". House lists can
 include a `to rent` card — we record `raw_fields.deal` and leave the
 price as the portal states it.
 
+## Le Figaro Immobilier
+
+[immobilier.lefigaro.fr](https://immobilier.lefigaro.fr/) is the
+domestic French portal (Figaro Classifieds / ex-Explorimmo). Best
+France complement to franimo: agency and particulier stock that
+franimo.nl does not carry. Listings **may overlap** franimo — they
+are stored as `source=lefigaro` and are **not** merged across
+portals. Public department SEO list/detail pages only. Language is
+FR; currency is EUR.
+
+**Home IP only.** A datacenter GET is Cloudflare-blocked (same class
+of wall as Holprop). Cached pages in `cache/` re-parse with zero
+requests after a home-IP fetch. Fixtures reconstruct the documented
+Nuxt SSR `ItemList` + listing ld+json shape from an archive snapshot
+of the Creuse house list (1 125 annonces, 2026), because this
+environment could not fetch live HTML.
+
+`robots.txt` disallows `/api/`, `/rest/`, `/recherche/` and most
+query strings under `/annonces/` except `page` and a named option
+list. Stay on the SEO path. Never hit those API routes. Pagination
+is `?page=N` and **stops at page 100** — a France-wide crawl silently
+loses its tail.
+
+```sh
+python3 -m lefigaro.scrape lf-23-houses-150k --no-details --max-pages 1   # trial
+python3 -m lefigaro.scrape lf-23-houses-150k --no-details                 # all ~47 list pages
+python3 -m lefigaro.scrape lf-23-houses-150k --detail-limit 20            # then details
+python3 -m lefigaro.scrape lf-58-houses-150k --no-details --max-pages 1   # parked Nièvre, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`).
+Default gap is 0.6s and default workers is 1 — be kind; do not run this
+in parallel with another scrape of the same host.
+
+Prefer **department SEO URLs**. Price query params (`?priceMax=`) were
+unreliable on a 2026-09-19 probe. The enabled seed is Creuse houses:
+
+`/annonces/immobilier-vente-maison-creuse.html`
+
+Archive snapshot 2026: **1 125** maisons / ~47 pages (24 per page).
+Page 1 is mixed (€19k next to €399k) — not cheap-first — so crawl
+every page of the department and cap at ingest. `skip.above` is EUR
+150000. `?option=petit_prix` and `?option=travaux` are parked until a
+home-IP run confirms they actually tighten the set.
+
+| search | listings | |
+|---|---|---|
+| `lf-23-houses-150k` (enabled) | 1 125 Creuse maisons | skip.above 150k |
+| `lf-58-houses-150k` (parked) | Nièvre maisons | same skip |
+| `lf-23-petit-prix` (parked) | `?option=petit_prix` | confirm on home IP |
+| `lf-23-travaux` (parked) | `?option=travaux` | confirm on home IP |
+| `lf-france-houses` (parked) | France-wide | page 100 hard stop |
+
+Detail ids are numeric
+(`/annonces/annonce-103112502.html`). `external_id` is that id.
+List cards give price / living m² / pièces / chambres / terrain
+from ItemList ld+json; DPE, agent, description and photos come
+from the detail page. `dept_fr` / `dept_nl` are the French
+department name (Creuse) so the locator map highlights.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
@@ -671,7 +736,8 @@ abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com;
 `mubawab/` scrapes mubawab.ma;
 `homege/` scrapes home.ge;
 `bulgarianproperties/` scrapes bulgarianproperties.com;
-`domaza/` scrapes domaza.com. Each CLI only runs its own source.
+`domaza/` scrapes domaza.com;
+`lefigaro/` scrapes immobilier.lefigaro.fr. Each CLI only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -696,6 +762,7 @@ mubawab/            mubawab.ma adapter + CLI
 homege/             home.ge adapter + CLI
 bulgarianproperties/  bulgarianproperties.com adapter + CLI
 domaza/             domaza.com adapter + CLI
+lefigaro/           immobilier.lefigaro.fr adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
