@@ -28,7 +28,7 @@ into one database and serves a single dense page you can sort, filter and map.
   more than one search is stored once and belongs to both.
 
 Working on this with an agent? `CLAUDE.md` has the order of operations and the
-traps; this file is the reference.
+traps; this file is the reference. Home-IP scrape checklist: `PLAYBOOK.md`.
 
 ## Setup
 
@@ -66,22 +66,33 @@ upsert — nothing is duplicated and nothing is lost.
 | `--redetail` | re-parse every detail page (from cache, so no network) — use after changing the parser |
 | `--max-pages N` | stop after N result pages, for quick trials |
 | `--gap S` / `--workers N` | request pacing. Default 0.3s between requests, 4 workers |
+| `--db PATH` | write a scratch sqlite file instead of `db/franimo.db` |
 
 Typical flow for a big search: `--no-details` first so the UI is usable, then let the
-detail backfill run in the background.
+detail backfill run in the background. `--db` points a trial at a scratch
+sqlite file so you do not write `db/franimo.db`.
+
+## When you're home
+
+Holprop is blocked from datacenter IPs (Cloudflare). The one-host-at-a-time
+checklist is `PLAYBOOK.md`: franimo refresh optional → Bulgaria → Japan →
+Holprop (home IP) → both Abruzzo 100k searches → export last, and only when
+you want Pages updated.
 
 ## Publishing a static copy
 
 ```sh
-python3 -m franimo.scrape        # refresh the data
-python3 -m franimo.export        # rebuild index.html + data/
+# after the scrapes you want (see PLAYBOOK.md) — not franimo alone
+python3 -m franimo.export        # rebuild index.html + data/ from the whole DB
 git add -A && git commit -m "data refresh" && git push
 ```
 
 The published site is `index.html`, `app.js`, `style.css` and `data/*.json` at
 the repo root — the same UI reading packed JSON instead of the local API, with
 no Python in it. GitHub Pages serves it from `main` at root; it also works from
-a `file://` path or any static host. Re-run `export` after every scrape.
+a `file://` path or any static host. Export writes every source in the
+database (bron facet); do that when you want Pages updated, not after a
+trial. Use `--out` for a local preview so you do not overwrite `data/`.
 
 The database lives in `db/` (gitignored) so it doesn't collide with the
 published `data/`.
@@ -172,6 +183,8 @@ The current set:
 | `hp-bg-houses-100k` / `hp-pt-houses-100k` / `hp-gr-houses-100k` / `hp-it-houses-100k` | Holprop other countries, same €100k house filter |  | parked |
 | `api-houses-100k` | **Abruzzo Property Italy ≤ €100k** | ~155 | active |
 | `api-houses-50k` / `api-houses-150k` | same site, €50k / €150k bands |  | parked |
+| `arp-houses-100k` | **Abruzzo Rural Property ≤ €100k** | ~345 | active |
+| `arp-houses-150k` | same site, €150k band |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -283,8 +296,9 @@ The portal can show **EUR** (and a GBP/USD pair on the same detail page). We
 store `price` + `currency=EUR` as displayed and keep £ / $ in `raw_fields`.
 Canonical detail URLs keep `?ctype=EUR` so a re-fetch does not flip currency.
 
-Some networks get a Cloudflare challenge on the first request; a cached page
-(sha1 of the full URL under `cache/`) re-parses with zero requests.
+Holprop **must** be scraped from a home IP. Datacenter networks get a
+Cloudflare challenge on the first request. A cached page (sha1 of the full
+URL under `cache/`) re-parses with zero requests.
 
 ## Abruzzo Property Italy
 
@@ -418,8 +432,9 @@ index.html          the published page (written by export)
 data/*.json         the published data (written by export)
 ```
 
-The UI shows a source badge and a "bron" facet. With only franimo data that
-is a single value; it starts to matter once Phase 1 adapters land.
+The UI shows a source badge and a "bron" facet. One `franimo.export` packs
+every source in `db/franimo.db`. Do not overwrite published `data/` with a
+tiny one-source export; use `--out` for a local build.
 
 ## Pruning
 
