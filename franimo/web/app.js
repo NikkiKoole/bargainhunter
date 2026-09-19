@@ -17,7 +17,9 @@ function unpack(p) {
       r[c] = (dict[c] && typeof v === 'number') ? dict[c][v] : v;
     });
     if (Array.isArray(r.thumb)) r.thumb = imgPrefixes[r.thumb[0]] + r.thumb[1];
-    if (r.url) r.url = urlPrefix + r.url;
+    if (r.url && urlPrefix && !/^https?:\/\//.test(r.url)) r.url = urlPrefix + r.url;
+    if (!r.source) r.source = 'franimo';
+    if (!r.currency) r.currency = 'EUR';
     // Derived fields are computed here rather than shipped, and days_known
     // stays correct as the export ages.
     r.eur_m2 = r.living_m2 > 0 ? r.price / r.living_m2 : null;
@@ -40,8 +42,8 @@ const median = a => { const s = a.filter(x => x != null).sort((x, y) => x - y);
   return s.length ? s[Math.floor(s.length / 2)] : null; };
 
 // ---------- filter state ----------
-const chosen = { searches: new Set(), type: new Set(), region: new Set(),
-                 dept_nl: new Set(), energy_label: new Set() };
+const chosen = { source: new Set(), searches: new Set(), type: new Set(),
+                 region: new Set(), dept_nl: new Set(), energy_label: new Set() };
 // `searches` is comma-joined (a listing can sit in several areas), so it needs
 // set-intersection rather than the plain equality the other facets use.
 const MULTI = new Set(['searches']);
@@ -53,8 +55,8 @@ function passes(r, skip) {
     // Built once per row and cached: rebuilding it per keystroke across 15k
     // listings was the whole cost of typing in the search box.
     if (r._hay === undefined) {
-      r._hay = [r.place, r.type, r.dept_nl, r.region, r.description, r.features,
-                r.agent, r.reference, r.snippet].filter(Boolean).join(' ').toLowerCase();
+        r._hay = [r.place, r.type, r.dept_nl, r.region, r.description, r.features,
+                  r.agent, r.reference, r.snippet, r.source].filter(Boolean).join(' ').toLowerCase();
     }
     if (!terms.every(w => r._hay.includes(w))) return false;
   }
@@ -101,7 +103,7 @@ function readFilters() {
     for (const r of ALL) {
       if (r._hay === undefined) {
         r._hay = [r.place, r.type, r.dept_nl, r.region, r.description, r.features,
-                  r.agent, r.reference, r.snippet].filter(Boolean).join(' ').toLowerCase();
+                  r.agent, r.reference, r.snippet, r.source].filter(Boolean).join(' ').toLowerCase();
       }
       r._text = terms.every(w => r._hay.includes(w));
     }
@@ -156,7 +158,7 @@ function facet(key, title, host, limit) {
 // ---------- table ----------
 const COLS = [
   { k: 'thumb', t: '', cls: 'thumb', cell: r => r.thumb ? `<img loading="lazy" src="${img(r.thumb)}">` : '' },
-  { k: 'type', t: 'type' },
+  { k: 'type', t: 'type', cell: r => `${r.type || ''}${r.source ? ` <span class="src">${r.source}</span>` : ''}` },
   { k: 'place', t: 'plaats', cls: 'place', cell: r => `${r.place || ''} <span class="tag">${r.dept_nl || ''}</span>` },
   { k: 'price', t: 'prijs', cls: 'num', cell: r => eur(r.price) +
       (r.price_drop ? ` <span class="drop">▼${num(r.price_drop)}</span>` : '') },
@@ -226,6 +228,7 @@ function renderGrid(rows) {
       ${r.thumb ? `<img loading="lazy" src="${img(r.thumb)}">` : ''}
       <div class="c"><h3>${r.type || ''} ${r.place || ''}</h3>
       <div class="meta"><span class="price">${eur(r.price)}</span>
+        ${r.source ? `<span class="src">${r.source}</span>` : ''}
         ${r.eur_m2 ? `<span>${num(r.eur_m2)} €/m²</span>` : ''}
         ${r.living_m2 ? `<span>${num(r.living_m2)} m²</span>` : ''}
         ${r.land_m2 ? `<span>${num(r.land_m2)} m² grond</span>` : ''}
@@ -346,9 +349,9 @@ async function openDrawer(r) {
     `<div class="fig"><b>${v}</b><span>${label}</span></div>`;
   $('#drawer-body').innerHTML = `
     <h2>${r.type || ''} ${r.place || ''}</h2>
-    <div class="sub">${r.dept_nl || ''}${r.region ? ' · ' + r.region : ''}
+    <div class="sub">${r.source ? `<span class="src">${r.source}</span> · ` : ''}${r.dept_nl || ''}${r.region ? ' · ' + r.region : ''}
       ${r.reference ? ' · ref ' + r.reference : ''} · #${r.id}
-      ${r.gone_at ? ' · <b>niet meer op franimo</b>' : ''}</div>
+      ${r.gone_at ? ` · <b>niet meer op ${r.source || 'de bron'}</b>` : ''}</div>
     <div class="figs">
       ${fig(eur(r.price), 'prijs')}
       ${fig(r.eur_m2 ? num(r.eur_m2) : null, '€/m²')}
@@ -362,7 +365,7 @@ async function openDrawer(r) {
     ${r.price_drop ? `<p class="drop">prijs verlaagd met ${eur(r.price_drop)}
        ${r.first_price ? `(was ${eur(r.old_price || r.first_price)})` : ''}</p>` : ''}
     ${locator(r)}
-    <a class="open" href="${r.url}" target="_blank" rel="noopener">open op franimo ↗</a>
+    <a class="open" href="${r.url}" target="_blank" rel="noopener">open op ${r.source || 'bron'} ↗</a>
     ${r.features ? `<div class="feat">${r.features}</div>` : ''}
     <div class="desc">${(r.description || r.snippet || '').replace(/</g, '&lt;')}</div>
     <div class="shots">${(r.photos || []).map(p =>
@@ -394,6 +397,7 @@ function render() {
     <b>${rows.filter(r => r.price_drop).length}</b> verlaagd` +
     (nodetail ? ` · <span title="detailpagina nog niet opgehaald">${nodetail} zonder m²</span>` : '');
 
+  facet('source', 'bron', $('#facet-source'));
   facet('searches', 'gebied', $('#facet-area'));
   facet('type', 'type', $('#facet-type'));
   facet('region', 'regio', $('#facet-region'));
@@ -465,6 +469,7 @@ Promise.all([
   fetch(STATIC ? 'data/meta.json' : '/api/meta').then(r => r.json()),
 ]).then(([rows, m]) => {
   ALL = unpack(rows); META = m;
+  ALL.forEach(r => { if (!r.source) r.source = 'franimo'; if (!r.currency) r.currency = 'EUR'; });
   const last = m.runs && m.runs[0];
   $('#runinfo').textContent = last
     ? `laatste run ${last.finished_at?.slice(0, 16).replace('T', ' ')} — ${last.seen} gevonden, ${last.new} nieuw, ${last.gone} verdwenen`

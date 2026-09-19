@@ -1,8 +1,11 @@
 # bargainhunter
 
-A better way to browse [franimo.nl](https://www.franimo.nl) (Dutch portal for French
-property). Scrapes saved searches into SQLite and serves a single dense page you
-can sort, filter and map — instead of clicking through pages of 14 results.
+A better way to browse cheap property listings. Today that means
+[franimo.nl](https://www.franimo.nl) (Dutch portal for French property);
+the scrape → SQLite → static page pipeline is built so other portals can
+plug in later. Scrapes saved searches into one database and serves a single
+dense page you can sort, filter and map — instead of clicking through pages
+of 14 results.
 
 ## What it does that the site doesn't
 
@@ -124,12 +127,15 @@ the request rate at the site.
 
 ## Searches
 
-`searches.json` holds named searches. To add one: run the search on franimo.nl, copy the
+`searches.json` holds named searches. Each entry has a `"source"` (the adapter
+to run). If you omit it, the loader treats the search as `"franimo"` so older
+files keep working. To add a franimo search: run it on franimo.nl, copy the
 URL, and paste its path in:
 
 ```json
 {
   "my-search": {
+    "source": "franimo",
     "label": "shown in the scraper output",
     "path": "/woning/?pricefrom=0&...&submitted=true&orderby=price%20asc"
   }
@@ -157,23 +163,38 @@ department in the UI instead.
 Searches overlap; listings are deduplicated by franimo id, and a detail page
 already fetched for one search is never fetched again for another.
 
-## Layout
+## Multi-source layout (Phase 0)
+
+Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter.
+`python3 -m franimo.scrape` / `export` / `serve` still work (thin wrappers).
+Phase 1 will add `ok_bulgaria` and `akiyaportal` adapters — not this tree.
+
+Listings are stored under `(source, external_id)` so two portals cannot
+collide on the same numeric id. The integer `id` is an internal key (UI,
+photos, price history). Existing franimo rows keep their current id; a
+migration fills `source='franimo'` and `external_id` from it.
 
 ```
-franimo/http.py     polite fetching + on-disk HTML cache
-franimo/parse.py    list-page and detail-page parsers
-franimo/db.py       schema, upserts, price history, column migration
-franimo/scrape.py   CLI orchestration
-franimo/serve.py    localhost UI + JSON API
-franimo/newsearch.py  add a radius search / size it up first
-franimo/compact.py    gzip cache files written before the cache was compressed
+core/http.py        polite fetching + gzip HTML cache + MIN_GAP
+core/db.py          schema, upserts, price history, source migration
+core/listing.py     normalized fields (price, currency, m², place, photos, url, …)
+core/searches.py    searches.json loader (`source` defaults to franimo)
+core/export.py      SQLite → packed JSON + static UI at repo root
+core/serve.py       localhost UI + JSON API
+core/adapter.py     SourceAdapter protocol / registry
+franimo/parse.py    franimo list-page and detail-page parsers
+franimo/scrape.py   franimo CLI (only runs source=franimo searches)
+franimo/newsearch.py  add a franimo radius search / size it up first
 franimo/prune.py      drop listings outside the price range you care about
 franimo/make_map.py   regenerate web/france.js (the locator map outline)
-franimo/web/        the page itself
+franimo/web/        the page itself — edit these, never the root copies
 db/franimo.db       the database (gitignored)
 index.html          the published page (written by export)
 data/*.json         the published data (written by export)
 ```
+
+The UI shows a source badge and a "bron" facet. With only franimo data that
+is a single value; it starts to matter once Phase 1 adapters land.
 
 ## Pruning
 
