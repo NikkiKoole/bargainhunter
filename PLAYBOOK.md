@@ -15,7 +15,8 @@ checklist.
 3. Akiya Portal `jp-houses-10k`
 4. Holprop `hp-es-houses-100k` (enable BG / PT / GR / IT if you want them)
 5. both Abruzzo adapters, full €100k (`api-houses-100k`, `arp-houses-100k`)
-6. **only then** export, and only when you want Pages updated
+6. Centrarium `ct-me-houses-100k` (5s crawl-delay; ~43 houses)
+7. **only then** export, and only when you want Pages updated
 
 ## Commands
 
@@ -46,6 +47,10 @@ python3 -m abruzzopropertyitaly.scrape api-houses-100k --no-details
 python3 -m abruzzopropertyitaly.scrape api-houses-100k
 python3 -m abruzzoruralproperty.scrape arp-houses-100k --no-details
 python3 -m abruzzoruralproperty.scrape arp-houses-100k
+
+# 6. Centrarium — robots.txt Crawl-delay: 5. ~43 houses under €100k.
+python3 -m centrarium.scrape ct-me-houses-100k --no-details
+python3 -m centrarium.scrape ct-me-houses-100k --detail-limit 20
 ```
 
 Look before you publish:
@@ -59,7 +64,8 @@ python3 -m franimo.serve            # http://localhost:8765 — bron facet, all 
 **`--no-details` first** on anything large. List pages make the UI usable in
 minutes; detail backfill is the long pole. **`--detail-limit N`** caps a run
 and the next run resumes, cheapest-first. Drop the cap on the Abruzzo 100k
-searches — they are hundreds of rows, not thousands.
+searches — they are hundreds of rows, not thousands. Centrarium's enabled
+seed is also small (~43); keep the 5s gap.
 
 **Never delete `cache/`.** Every fetched page is gzipped, keyed by sha1(full
 URL). `--redetail` re-parses from disk with zero requests. Do not move cache
@@ -83,7 +89,7 @@ must not become the published payload.
 
 The UI is already multi-source: source badge + **bron** facet. One export
 packs every row in the database — franimo, Bulgaria, Japan, Holprop, both
-Abruzzo agencies. There is no per-source publish step.
+Abruzzo agencies, Centrarium. There is no per-source publish step.
 
 Export when you want https://mipolai.com/bargainhunter/ updated, not after
 every scrape:
@@ -109,6 +115,7 @@ want it in the default pass.
 | `hp-pt-houses-100k` / `hp-gr-houses-100k` / `hp-it-houses-100k` | holprop | other countries, same €100k house filter |
 | `api-houses-150k` | abruzzopropertyitaly | wider EUR band (196 listings) |
 | `arp-houses-150k` | abruzzoruralproperty | wider EUR band |
+| `ct-me-houses` | centrarium | all 826 Montenegro houses, no price skip |
 
 ```sh
 python3 -m ok_bulgaria.scrape bg-houses-100k --no-details
@@ -116,6 +123,7 @@ python3 -m akiyaportal.scrape jp-houses-25k --no-details
 python3 -m holprop.scrape hp-bg-houses-100k --no-details
 python3 -m abruzzopropertyitaly.scrape api-houses-150k --no-details
 python3 -m abruzzoruralproperty.scrape arp-houses-150k --no-details
+python3 -m centrarium.scrape ct-me-houses --no-details
 ```
 
 `jp-akita` and `api-houses-50k` are also parked (regional / narrower). Same
