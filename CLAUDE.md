@@ -2,7 +2,8 @@
 
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
-Akiya Portal, Holprop, and Abruzzo Property Italy. Shared HTTP/DB/export live
+Akiya Portal, Holprop, Abruzzo Property Italy, and Abruzzo Rural Property.
+Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
 to get wrong.
@@ -17,6 +18,7 @@ python3 -m ok_bulgaria.scrape             # 1b. OK Bulgaria (separate process; d
 python3 -m akiyaportal.scrape             # 1c. Akiya Portal (separate process)
 python3 -m holprop.scrape                 # 1d. Holprop (separate process)
 python3 -m abruzzopropertyitaly.scrape    # 1e. Abruzzo Property Italy (separate process)
+python3 -m abruzzoruralproperty.scrape    # 1f. Abruzzo Rural Property (separate process)
 python3 -m franimo.export                 # 2. rebuild index.html + data/*.json
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -29,7 +31,8 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 **One scraper at a time per host.** The rate limit (`MIN_GAP` in `core.http`)
 is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
-OK Bulgaria, Akiya Portal, Holprop and Abruzzo Property Italy default to 0.6s / 1 worker.
+OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy and
+Abruzzo Rural Property default to 0.6s / 1 worker.
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
 minutes and makes the UI usable; the detail backfill is the long pole (~3.3 pages/s).
@@ -52,7 +55,9 @@ not assume it equals the portal id once a second source exists.
 `python3 -m akiyaportal.scrape` only runs `akiyaportal` (e.g. `jp-houses-10k`);
 `python3 -m holprop.scrape` only runs `holprop` (e.g. `hp-es-houses-100k`);
 `python3 -m abruzzopropertyitaly.scrape` only runs `abruzzopropertyitaly`
-(e.g. `api-houses-100k`).
+(e.g. `api-houses-100k`);
+`python3 -m abruzzoruralproperty.scrape` only runs `abruzzoruralproperty`
+(e.g. `arp-houses-100k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -96,6 +101,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, price, currency, living_m2, land_m2
   FROM listings WHERE source='abruzzopropertyitaly' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, price, currency, living_m2, land_m2
+  FROM listings WHERE source='abruzzoruralproperty' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -127,8 +136,9 @@ the browser, not stored, so a published build doesn't go stale.
 
 ## Adding a source adapter
 
-`ok_bulgaria`, `akiyaportal`, `holprop` and `abruzzopropertyitaly` are in.
-Do not start Centrarium or Mubawab here. Each adapter is its own package that:
+`ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly` and
+`abruzzoruralproperty` are in. Do not start Centrarium or Mubawab here.
+Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
   `register()`s itself
@@ -166,6 +176,16 @@ price bucket, not a house-only filter. The site's pager drops the price
 filter; keep minprice/maxprice and set `page=` (0-based; page 1 omits it).
 Detail ids are numeric pids (`pid=3223`). A leftover "PCM" label on sale
 pages is ignored. 0.00 SQM means not stated.
+
+Abruzzo Rural Property displays EUR. The for-sale list paginates with
+`start=0,6,12,…` (6 per page). A GET `search[price_from]` /
+`search[price_to]` slider works — the seed is
+`/find-a-property/for-sale?search[price_from]=0&search[price_to]=100000&fwrealestate_update_search=1`
+(verified 2026-09-19: End start=342, ~345 cards including sold/under
+offer). Detail ids are numeric CMS ids (`/item/1792-…`). Agency refs
+(FL4245) are `reference`. Site-wide geo.position is the San Salvo
+office — do not store it as listing lat/lon. Complements
+abruzzopropertyitaly (different agency stock).
 
 ## Regenerating the locator map
 

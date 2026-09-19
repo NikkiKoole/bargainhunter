@@ -166,5 +166,22 @@
     "note": "Same tilde search, maxprice=150000. Verified 2026-09-19: 196 listings / 4 pages. Parked; run by name.",
     "path": "/property-search~for=1,minprice=0,maxprice=150000,order=priceasc,do=search",
     "enabled": false
+  },
+  "arp-houses-100k": {
+    "source": "abruzzoruralproperty",
+    "label": "Abruzzo Rural Property ≤ €100k",
+    "note": "abruzzoruralproperty.com for-sale list with the site's own GET price slider. /find-a-property/for-sale?search[price_from]=0&search[price_to]=100000&fwrealestate_update_search=1. Verified 2026-09-19: End start=342 (~58 pages × 6 = ~345 cards, including SOLD/UNDER OFFER with no euro figure). Unfiltered End is start=372 (~375). 6 cards per page; pager keeps search[] and steps start=0,6,12,…. Different agency stock from abruzzopropertyitaly. skip.above is EUR.",
+    "path": "/find-a-property/for-sale?search[price_from]=0&search[price_to]=100000&fwrealestate_update_search=1",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "arp-houses-150k": {
+    "source": "abruzzoruralproperty",
+    "label": "Abruzzo Rural Property ≤ €150k",
+    "note": "Same GET slider, price_to=150000. Verified 2026-09-19: End start=360 (~61 pages). Parked; run by name.",
+    "path": "/find-a-property/for-sale?search[price_from]=0&search[price_to]=150000&fwrealestate_update_search=1",
+    "enabled": false
   }
 }
