@@ -40,14 +40,31 @@ AREA_RE = re.compile(
     r"([\d][\d\s.,]*)\s*(?:m²|m2|sq\.?\s*m|sqm)\b", re.I
 )
 PLOT_RE = re.compile(
-    r"(?:on\s+a\s+plot\s+of|plot\s+of(?:\s+land)?|the\s+plot\s+is|plot\s+is|"
-    r"land\s+plot\s+of|plot\s+of\s+land\s+of)\s*"
+    r"(?:on\s+a\s+plot\s+of|"
+    r"the\s+plot\s+of\s+land\s+is|"
+    r"the\s+plot\s+is|"
+    r"plot\s+is|"
+    r"plot\s+of\s+land(?:\s+for\b.{0,80})?\s+(?:with\s+an\s+)?area\s+of|"
+    r"land\s+plot\s+of|"
+    r"plot\s+of\s+land\s+of|"
+    r"plot\s+of(?:\s+land)?)\s*"
     r"([\d][\d\s.,]*)\s*(?:m²|m2|sq\.?\s*m|sqm)\b",
     re.I,
 )
 TYPE_RE = re.compile(
     r"\b(House|Villa|Cottage|Townhouse|Town house|Chalet|Maisonette)\b", re.I
 )
+# "House in Niksic Montenegro" / "by the sea in Bar (Susanj) Montenegro"
+TITLE_PLACE_RE = re.compile(
+    r"\bin\s+([A-Z][A-Za-z'’ -]+?)(?:\s*\(([^)]+)\))?\s+Montenegro\b"
+)
+SLUG_PLACE = {
+    "bar-me": "Bar",
+    "herceg-novi": "Herceg Novi",
+    "central-region-me": "Central region",
+    "northern-region": "Northern Region",
+    "coastal-region": "Coastal Region",
+}
 LATIN_WORD_RE = re.compile(r"[A-Za-z]")
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 COUNTRY_NAMES = {
@@ -159,6 +176,32 @@ def _clean_label(text: str | None) -> str:
     # Drop emoji / dingbats / VS16 so "📐 Total area:" → "total area"
     text = re.sub(r"[\u2600-\u27BF\U0001F300-\U0001FAFF\uFE0F\u200D]", "", text)
     return re.sub(r"\s+", " ", text).strip(" :").lower()
+
+
+def _place_from_title(title: str | None) -> tuple[str | None, str | None]:
+    if not title:
+        return None, None
+    m = TITLE_PLACE_RE.search(title)
+    if not m:
+        return None, None
+    town, extra = m.group(1).strip(), (m.group(2) or "").strip()
+    if extra:
+        return extra, town
+    return town, town
+
+
+def _place_from_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    m = re.search(r"/en/([^/]+)/", url)
+    if not m:
+        return None
+    slug = m.group(1).lower()
+    if slug in {"montenegro", "item", "search"}:
+        return None
+    if slug in SLUG_PLACE:
+        return SLUG_PLACE[slug]
+    return slug.replace("-", " ").title()
 
 
 def _place_region(addr: str | None) -> tuple[str | None, str | None]:
@@ -495,6 +538,13 @@ def parse_detail(html: str, url: str) -> dict[str, Any]:
         or _txt(s.select_one(".rp-vw-gallery-addr"))
     )
     place, region = _place_region(addr)
+    if not place or not region:
+        t_place, t_region = _place_from_title(headline)
+        place = place or t_place
+        region = region or t_region
+    if not place:
+        place = _place_from_url(out.get("url") or url)
+        region = region or place
     if place:
         out["place"] = place
     if region:

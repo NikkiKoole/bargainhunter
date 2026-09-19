@@ -9,7 +9,14 @@ from core.adapter import ADAPTERS, get
 from core.db import connect, now, upsert_from_list, update_from_detail
 from core.searches import enabled_names, load_searches
 from centrarium.http import DEFAULT_GAP
-from centrarium.parse import parse_detail, parse_eur, parse_list, with_page
+from centrarium.parse import (
+    _land_from_text,
+    _place_from_title,
+    parse_detail,
+    parse_eur,
+    parse_list,
+    with_page,
+)
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "centrarium"
 LIST_URL = "https://centrarium.com/en/montenegro/sale/houses/lowprice-montenegro/"
@@ -71,6 +78,29 @@ class Pagination(unittest.TestCase):
         page1 = with_page(nxt, 1)
         self.assertNotIn("page=", page1)
         self.assertTrue(page1.endswith("/lowprice-montenegro/"))
+
+
+class LandPhrases(unittest.TestCase):
+    def test_plot_variants(self):
+        self.assertEqual(_land_from_text("on a plot of 300 sq. m"), 300)
+        self.assertEqual(_land_from_text("The plot is 540 sq. m."), 540)
+        self.assertEqual(
+            _land_from_text(
+                "A plot of land for housing construction with an area of 304 sq. m."
+            ),
+            304,
+        )
+        self.assertEqual(_land_from_text("The plot of land is 1271 sq. m."), 1271)
+
+    def test_title_place(self):
+        self.assertEqual(
+            _place_from_title("by the sea in Bar (Susanj) Montenegro area 26m²"),
+            ("Susanj", "Bar"),
+        )
+        self.assertEqual(
+            _place_from_title("House in Niksic Montenegro area 143m² 2 floors"),
+            ("Niksic", "Niksic"),
+        )
 
 
 class Money(unittest.TestCase):
@@ -171,6 +201,36 @@ class DetailParser(unittest.TestCase):
         self.assertAlmostEqual(d["lat"], 42.780472)
         self.assertAlmostEqual(d["lon"], 18.956165)
         self.assertIn("Niksic", d["description"])
+
+    def test_cyrillic_address_falls_back_to_title_and_plot_area(self):
+        html = """
+        <html><head>
+        <script type="application/ld+json">{"@type":"Product","name":"by the sea in Bar (Susanj) Montenegro area 26m²",
+        "offers":{"price":45000,"priceCurrency":"EUR"}}</script>
+        </head><body>
+        <h1>by the sea in Bar (Susanj) Montenegro area 26m² 1 floors</h1>
+        <div class="vw-price-num">45 000 €</div>
+        <div class="rp-vw-gallery-addr">Черногория, Бар, Шушань</div>
+        <div class="vw-descr">A plot of land for housing construction with an area of 304 sq. m.
+        There is a permanent house of 26 sq. m.</div>
+        <div class="vw-dynprops">
+          <div class="vw-dynprops-item">
+            <div class="vw-dynprops-item-attr">Total area:</div>
+            <div class="vw-dynprops-item-val">26 m²</div>
+          </div>
+        </div>
+        </body></html>
+        """
+        d = parse_detail(
+            html,
+            "https://centrarium.com/en/bar-me/u-mora-v-bare-shushan-ploshhad-26m2-1-etazhnyj-64043.html",
+        )
+        self.assertEqual(d["external_id"], "64043")
+        self.assertEqual(d["place"], "Susanj")
+        self.assertEqual(d["region"], "Bar")
+        self.assertEqual(d["living_m2"], 26)
+        self.assertEqual(d["land_m2"], 304)
+        self.assertEqual(d["price"], 45000)
 
 
 class Store(unittest.TestCase):
