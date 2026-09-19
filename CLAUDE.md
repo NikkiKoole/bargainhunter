@@ -1,8 +1,11 @@
 # Working on bargainhunter
 
-Scrapes franimo.nl (Dutch portal for French property) into SQLite and publishes a
-static browser at https://mipolai.com/bargainhunter/. `README.md` is the reference;
-this file is the order of operations and the things that are easy to get wrong.
+Scrapes property portals into SQLite and publishes a static browser at
+https://mipolai.com/bargainhunter/. Franimo.nl is the only live source today;
+shared HTTP/DB/export live in `core/` so Phase 1 adapters (ok_bulgaria,
+akiyaportal) can plug in without rewriting that path. `README.md` is the
+reference; this file is the order of operations and the things that are
+easy to get wrong.
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 
@@ -19,20 +22,27 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 
 ## Rules that matter
 
-**One scraper at a time.** The rate limit (`MIN_GAP`, one request per 0.3s) is a
-module global, so two processes double the request rate at franimo. Chain runs; don't
-parallelise them.
+**One scraper at a time.** The rate limit (`MIN_GAP` in `core.http`, default
+gap 0.3s on the franimo CLI) is a process-wide lock, so two processes double
+the request rate at the host. Chain runs; don't parallelise them.
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
 minutes and makes the UI usable; the detail backfill is the long pole (~3.3 pages/s).
 `--detail-limit N` caps a run and the next run resumes, cheapest-first.
 
-**Never delete `cache/`.** Every fetched page is stored gzipped. This is what makes
-`--redetail` re-parse all 10k listings *with zero requests* after a parser change —
-the single most useful property of this codebase. Reach for it whenever you touch
-`parse.py`.
+**Never delete `cache/`.** Every fetched page is stored gzipped, keyed by
+sha1(full URL). This is what makes `--redetail` re-parse all 10k listings
+*with zero requests* after a parser change — the single most useful property
+of this codebase. Reach for it whenever you touch `parse.py`. Do not move
+cache files into per-source subdirectories; that would orphan the existing
+store.
 
 **The database is `db/franimo.db`,** not `data/`. `data/` is the published JSON.
+Rows are unique on `(source, external_id)`. `id` is an internal integer — do
+not assume it equals the portal id once a second source exists.
+
+**`searches.json` `"source"`** selects the adapter. Omitted source means
+`franimo`. `python3 -m franimo.scrape` only runs franimo searches.
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -77,15 +87,30 @@ a bargain-finder. Surface source errors; don't silently filter them.
 
 ## Changing the page
 
-`franimo/web/{index.html,app.js,style.css,france.js}` are the sources. `export.py`
-copies them to the repo root — edit the originals in `franimo/web/`, never the copies.
+`franimo/web/{index.html,app.js,style.css,france.js}` are the sources.
+`core/export.py` copies them to the repo root — edit the originals in
+`franimo/web/`, never the copies. `python3 -m franimo.export` is a wrapper.
 
 `app.js` runs against both the local API and the static export (`window.FRANIMO_STATIC`).
 The static build ships packed JSON (columnar + dictionary-coded); `unpack()` in
-`app.js` must stay in step with `pack()` in `export.py`.
+`app.js` must stay in step with `pack()` in `core/export.py`. A listing with no
+`source` column (older exports) is treated as franimo.
 
 Derived fields (`eur_m2`, `eur_m2_land`, `price_drop`, `days_known`) are computed in
 the browser, not stored, so a published build doesn't go stale.
+
+## Adding a source adapter (Phase 1 — not this PR)
+
+Next adapters: `ok_bulgaria`, `akiyaportal`. Each is its own package that:
+
+* implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
+  `register()`s itself
+* writes listings through `core.db.upsert_from_list` with `source` +
+  `external_id` set (never reuse another portal's integer `id`)
+* is selected by `"source"` on a searches.json entry
+* uses `core.http.Fetcher(base=..., gap=...)` so cache keys stay sha1(full URL)
+
+Do not scrape those sites until that PR. Do not invent a second database.
 
 ## Regenerating the locator map
 

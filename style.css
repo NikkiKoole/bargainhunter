@@ -64,6 +64,8 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 td.thumb img{width:74px;height:50px;object-fit:cover;border-radius:4px;display:block;background:var(--panel2)}
 td.place{max-width:190px;overflow:hidden;text-overflow:ellipsis}
 .tag{font-size:11px;padding:1px 5px;border-radius:99px;background:var(--panel2);color:var(--dim)}
+.src{font-size:10px;padding:1px 5px;border-radius:99px;background:var(--panel2);color:var(--accent);
+  text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 .drop{color:var(--good);font-size:12px}
 .gone{opacity:.45}
 .new{color:var(--accent)}

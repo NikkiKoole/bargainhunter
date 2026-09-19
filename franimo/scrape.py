@@ -12,15 +12,19 @@ Re-running is cheap and safe: pages already in cache/ aren't re-downloaded
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
+from core.listing import DEFAULT_SOURCE
+from core.searches import SEARCHES, enabled_names, load_searches
+
+from . import adapter as _adapter  # noqa: F401  — register franimo
 from . import db
 from .http import BASE, Fetcher
 from .parse import parse_detail, parse_list
+
+SOURCE = "franimo"
 
 # franimo stops paginating at ~714 pages (~10k results); page 715+ redirects to
 # /error/. A search bigger than that has to be split into price bands.
@@ -30,13 +34,6 @@ PAGE_CEILING = 700
 def with_prices(path: str, lo: int, hi: int) -> str:
     path = re.sub(r"pricefrom=\d+", f"pricefrom={lo}", path)
     return re.sub(r"priceto=\d+", f"priceto={hi}", path)
-
-ROOT = Path(__file__).resolve().parent.parent
-SEARCHES = ROOT / "searches.json"
-
-
-def load_searches() -> dict:
-    return json.loads(SEARCHES.read_text(encoding="utf-8"))
 
 
 def _skipped(row: dict, skip: dict) -> bool:
@@ -81,8 +78,11 @@ def crawl_search(con, fetcher: Fetcher, name: str, spec: dict, max_pages: int | 
             for row in page["listings"]:
                 if _skipped(row, skip):
                     continue
-                counts[db.upsert_from_list(con, row, name, ts)] += 1
-                seen_ids.append(row["id"])
+                row["source"] = SOURCE
+                row["external_id"] = str(row["id"])
+                status, lid = db.upsert_from_list(con, row, name, ts, source=SOURCE)
+                counts[status] += 1
+                seen_ids.append(lid)
             con.commit()
             print(f"  page {band_pages}/{page['total_pages']}  "
                   f"({len(set(seen_ids))} listings)", flush=True)
@@ -172,11 +172,16 @@ def main(argv=None) -> int:
     searches = load_searches()
     # Running with no arguments skips searches marked "enabled": false, so a
     # superseded search stays on file (and runnable by name) without being
-    # re-scraped every time.
-    names = args.search or [n for n, s in searches.items() if s.get("enabled", True)]
+    # re-scraped every time. Non-franimo searches are someone else's adapter.
+    names = args.search or enabled_names(searches, source=SOURCE)
     unknown = [n for n in names if n not in searches]
     if unknown:
         ap.error(f"unknown search(es): {', '.join(unknown)}. Known: {', '.join(searches)}")
+    foreign = [n for n in names
+               if searches[n].get("source", DEFAULT_SOURCE) != SOURCE]
+    if foreign:
+        ap.error(f"not a franimo search: {', '.join(foreign)}. "
+                 f"Use that source's scrape module instead.")
 
     con = db.connect(args.db)
     fetcher = Fetcher(refresh=args.refresh, max_age_days=args.max_age, gap=args.gap)

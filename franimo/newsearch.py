@@ -14,8 +14,9 @@ import argparse
 import json
 import re
 
+from core.searches import SEARCHES
+
 from .http import BASE, Fetcher
-from .scrape import SEARCHES
 
 # every franimo property type except appartement (2), nieuwbouw (31, 32) and kantoor (33)
 DEFAULT_TYPES = [i for i in range(1, 35) if i not in {2, 31, 32, 33}]
@@ -103,6 +104,7 @@ def main(argv=None) -> int:
 
     searches = json.loads(SEARCHES.read_text(encoding="utf-8"))
     searches[args.name] = {
+        "source": "franimo",
         "label": args.label or ("heel Frankrijk" if args.france
                                 else f"{args.km:g}km rond {args.lat}, {args.lon}"),
         "note": (("whole of France" if args.france
