@@ -182,7 +182,7 @@ class Store(unittest.TestCase):
             detail = parse_detail(_html("detail_house.html"), HOUSE_URL)
             update_from_detail(con, hid, detail, ts)
             row = con.execute(
-                "SELECT source, external_id, price, currency, bedrooms, baths, place "
+                "SELECT source, external_id, price, currency, bedrooms, baths, place, lat, lon "
                 "FROM listings WHERE id=?", (hid,)
             ).fetchone()
             self.assertEqual(row["source"], "abruzzopropertyitaly")
@@ -192,6 +192,8 @@ class Store(unittest.TestCase):
             self.assertEqual(row["bedrooms"], 2)
             self.assertEqual(row["baths"], 1)
             self.assertEqual(row["place"], "Prezza")
+            self.assertAlmostEqual(row["lat"], 42.0578995)
+            self.assertAlmostEqual(row["lon"], 13.83422357)
             _, fid = upsert_from_list(
                 con, {"id": "3223", "place": "Dijon", "price": 90000},
                 "france-150k", ts, source="franimo")

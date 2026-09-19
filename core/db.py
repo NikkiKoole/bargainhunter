@@ -102,7 +102,8 @@ CREATE INDEX IF NOT EXISTS idx_hist_listing   ON price_history(listing_id);
 
 LIST_COLS = ("url", "type", "place", "region", "dept_nl", "lat", "lon", "price", "old_price",
              "beds", "living_m2", "land_m2", "reference", "thumb", "snippet", "promoted")
-DETAIL_COLS = ("url", "type", "place", "region", "dept_nl", "dept_fr", "price", "rooms",
+DETAIL_COLS = ("url", "type", "place", "region", "dept_nl", "dept_fr", "lat", "lon",
+               "price", "rooms",
                "bedrooms", "baths", "living_m2", "land_m2", "year_built", "energy_label",
                "gas_label", "energy_kwh", "gas_co2", "reference", "agent", "agent_name", "agent_address",
                "description", "features", "photos", "raw_fields", "currency")
