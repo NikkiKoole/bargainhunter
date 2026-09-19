@@ -241,6 +241,32 @@ class DetailParser(unittest.TestCase):
         self.assertAlmostEqual(d["lon"], 25.257092241842)
         self.assertGreaterEqual(len(d["photos"] or []), 3)
 
+    def test_live_ld_newlines_and_org_url_ignored(self):
+        """Live Product JSON-LD has raw newlines; Organization url is the homepage."""
+        html = """
+        <html><head>
+        <script type="application/ld+json">{
+          "@type": "Product",
+          "name": "House",
+          "description": "line one
+line two",
+          "offers": {"price": 5900, "priceCurrency": "EUR",
+            "url": "https://www.bulgarianproperties.com/Houses_in_Bulgaria/AD91080BG_x.html"}
+        }</script>
+        <script type="application/ld+json">{
+          "@type": "Organization",
+          "url": "https://www.bulgarianproperties.com/"
+        }</script>
+        </head><body>
+        <div class="component-single-property-price"><span class="regular-price">€ 5 900</span></div>
+        </body></html>
+        """
+        d = parse_detail(html, HOUSE_URL)
+        self.assertEqual(d["external_id"], "AD91080BG")
+        self.assertEqual(d["price"], 5900)
+        self.assertIn("/AD91080BG", d["url"])
+        self.assertNotEqual(d["url"].rstrip("/"), "https://www.bulgarianproperties.com")
+
     def test_gbp_only_ld_converts(self):
         html = """
         <html><head>

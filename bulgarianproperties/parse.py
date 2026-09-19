@@ -124,10 +124,15 @@ def _area(text: str | None) -> int | None:
 
 
 def _json_load(raw: str) -> Any:
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
+    """Parse JSON-LD. Live Product blobs have raw newlines in description."""
+    if not raw:
         return None
+    for kwargs in ({}, {"strict": False}):
+        try:
+            return json.loads(raw, **kwargs)
+        except json.JSONDecodeError:
+            continue
+    return None
 
 
 def _as_list(data: Any) -> list:
@@ -504,7 +509,7 @@ def _ld_product(blocks: list[dict]) -> dict:
         if block.get("@type") in ("Product", "Offer", "RealEstateListing",
                                   "SingleFamilyResidence"):
             return block
-    return blocks[0] if blocks else {}
+    return {}
 
 
 def _field_map(soup) -> dict[str, str]:
@@ -526,18 +531,17 @@ def _photos(ld: dict, soup, page_url: str) -> list[str]:
             urls.append(img)
         elif isinstance(img, dict) and img.get("url"):
             urls.append(img["url"])
-    if not urls:
-        for img in soup.select(
-            ".component-single-property-head-gallery img, "
-            ".component-single-property-content-gallery img, "
-            ".property-gallery img"
-        ):
-            src = img.get("src") or img.get("data-src")
-            if not src or src.startswith("data:"):
-                continue
-            if "property-images" not in src:
-                continue
-            urls.append(urljoin(page_url, src))
+    for img in soup.select(
+        ".component-single-property-head-gallery img, "
+        ".component-single-property-content-gallery img, "
+        ".property-gallery img"
+    ):
+        src = img.get("src") or img.get("data-src")
+        if not src or src.startswith("data:"):
+            continue
+        if "property-images" not in src:
+            continue
+        urls.append(urljoin(page_url, src))
     seen: set[str] = set()
     out = []
     for u in urls:
@@ -718,7 +722,10 @@ def parse_detail(html: str, url: str) -> dict[str, Any]:
     out: dict[str, Any] = {
         "source": SOURCE,
         "external_id": ext,
-        "url": (offer.get("url") or ld.get("url") or url),
+        "url": next(
+            (c for c in (offer.get("url"), ld.get("url"), url) if listing_id(c)),
+            url,
+        ),
         "type": ptype,
         "place": place,
         "region": region,
