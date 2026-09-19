@@ -3,7 +3,7 @@
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
 Akiya Portal, Holprop, Abruzzo Property Italy, Abruzzo Rural Property,
-and Centrarium.
+Centrarium, and Mubawab.
 Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
@@ -22,6 +22,7 @@ python3 -m holprop.scrape                 # 1d. Holprop — home IP only (Cloudf
 python3 -m abruzzopropertyitaly.scrape    # 1e. Abruzzo Property Italy (separate process)
 python3 -m abruzzoruralproperty.scrape    # 1f. Abruzzo Rural Property (separate process)
 python3 -m centrarium.scrape              # 1g. Centrarium (separate process; 5s crawl-delay)
+python3 -m mubawab.scrape                 # 1h. Mubawab Morocco (separate process)
 python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -38,8 +39,8 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 **One scraper at a time per host.** The rate limit (`MIN_GAP` in `core.http`)
 is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
-OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy and
-Abruzzo Rural Property default to 0.6s / 1 worker. Centrarium
+OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy,
+Abruzzo Rural Property and Mubawab default to 0.6s / 1 worker. Centrarium
 defaults to 5s / 1 worker (`robots.txt` Crawl-delay: 5).
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
@@ -68,7 +69,9 @@ experiments at `--db db/scratch.db` so a trial cannot trash the real file.
 `python3 -m abruzzoruralproperty.scrape` only runs `abruzzoruralproperty`
 (e.g. `arp-houses-100k`);
 `python3 -m centrarium.scrape` only runs `centrarium`
-(e.g. `ct-me-houses-100k`).
+(e.g. `ct-me-houses-100k`);
+`python3 -m mubawab.scrape` only runs `mubawab`
+(e.g. `mw-ma-houses-100k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -120,6 +123,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, price, currency, living_m2, land_m2
   FROM listings WHERE source='centrarium' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, price, currency, living_m2, land_m2
+  FROM listings WHERE source='mubawab' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -152,7 +159,7 @@ the browser, not stored, so a published build doesn't go stale.
 ## Adding a source adapter
 
 `ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly`,
-`abruzzoruralproperty` and `centrarium` are in. Do not start Mubawab here.
+`abruzzoruralproperty`, `centrarium` and `mubawab` are in.
 Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
@@ -212,6 +219,17 @@ is EUR 100000 (~43 cards on 2026-09-19). Detail ids are numeric
 `Disallow: /*?page=` is an indexer rule (path `/page/2/` 404s) — follow
 the site's `?page=N` pager at 5s / 1 worker. Unfiltered `/houses/` can
 paint USD; prefer lowprice. Serbia / Albania lowprice URLs 404'd.
+
+Mubawab displays MAD on most cards (`350,000 DH`; JSON-LD
+`priceCurrency: MAD`) and EUR on some (`85,000 EUR`). We convert MAD
+with the documented fixed rate in `mubawab/fx.py` (10.9 MAD/EUR; not a
+live ECB / BAM feed) and keep the original in `raw_fields`. The seed is
+`/en/sc/houses-for-sale:pr:0-1100000` — the site's own MAD colon
+filter, verified live (375 houses on 2026-09-19). `?maxPrice=` and
+`:mp:` are no-ops. `skip.above` is EUR 100000. Pagination is `:p:N`
+(page 1 omits it). `robots.txt` `Disallow: /*:` is an indexer rule —
+follow the site's pager. Morocco: titled urban/peri-urban only; never
+ag land without a lawyer. Detail ids are numeric (`/en/a/8418668/…`).
 
 ## Regenerating the locator map
 
