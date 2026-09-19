@@ -1,9 +1,6 @@
 """Source adapter contract.
 
-Phase 1 will add packages (ok_bulgaria, akiyaportal, …) that implement this
-and register themselves. Phase 0 only ships franimo; do not add other
-scrapers here.
-
+Adapters (franimo, ok_bulgaria, …) implement this and register themselves.
 A search in searches.json points at an adapter via `"source"`. Existing
 entries that omit it are treated as `"franimo"`.
 """
