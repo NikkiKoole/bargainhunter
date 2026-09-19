@@ -1,11 +1,12 @@
 # bargainhunter
 
 A better way to browse cheap property listings. Today that means
-[franimo.nl](https://www.franimo.nl) (Dutch portal for French property) and
+[franimo.nl](https://www.franimo.nl) (Dutch portal for French property),
 [OK Bulgaria](https://www.cheap-bulgarian-house.co.uk/) (UK-facing Bulgarian
-houses). The scrape → SQLite → static page pipeline is shared; each portal
-is a `core.adapter` package. Scrapes saved searches into one database and
-serves a single dense page you can sort, filter and map.
+houses), and [Akiya Portal](https://akiyaportal.com/) (English listings of
+vacant houses in Japan). The scrape → SQLite → static page pipeline is
+shared; each portal is a `core.adapter` package. Scrapes saved searches
+into one database and serves a single dense page you can sort, filter and map.
 
 ## What it does that the site doesn't
 
@@ -37,11 +38,12 @@ pip install -r requirements.txt
 ```sh
 python3 -m franimo.scrape          # enabled franimo searches
 python3 -m ok_bulgaria.scrape      # enabled OK Bulgaria searches
+python3 -m akiyaportal.scrape      # enabled Akiya Portal searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria.
+`python3 -m franimo.scrape` will not touch Bulgaria or Japan.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -157,6 +159,9 @@ The current set:
 | `boerderijen-oost` | the original: boerderij, herenhuis, dorpsboerderij, bar-café, hotel | ~212 | active |
 | `bg-houses-50k` | **OK Bulgaria houses £0–50k** | ~1.3k | active |
 | `bg-houses-100k` / `bg-houses-150k` | same site, wider GBP bands |  | parked |
+| `jp-houses-10k` | **Akiya Portal houses under $10k** | ~5.6k | active |
+| `jp-houses-25k` / `jp-houses-50k` | same site, wider USD bands |  | parked |
+| `jp-akita` | Akiya Portal, Akita prefecture | ~1.2k | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -196,11 +201,40 @@ The scraper never follows that URL: it keeps the search query (`low_price` /
 `high_price`) and sets `page=` itself, so the HTML cache stays a function of
 the full URL.
 
+## Akiya Portal
+
+[akiyaportal.com](https://akiyaportal.com/) aggregates vacant-house (akiya)
+listings from AtHome, Suumo and Homes.co.jp and translates them to English.
+`robots.txt` allows `/` and disallows `/admin`. Public list/detail pages only.
+
+```sh
+python3 -m akiyaportal.scrape jp-houses-10k --no-details --max-pages 1   # trial
+python3 -m akiyaportal.scrape jp-houses-10k --no-details                 # all list pages
+python3 -m akiyaportal.scrape jp-houses-10k --detail-limit 50            # then details
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`). Default
+gap is 0.6s and default workers is 1 — be kind; do not run this in parallel
+with another scrape of the same host.
+
+The list URL is the site's own search form: `/listings?max_price=10000`
+("Under $10,000"). Checked live on 2026-09-19: 5,552 results over 232 pages,
+every card on page 1 actually under $10k. Earlier notes that `?max_price=`
+was weak are stale. We do **not** crawl the unfiltered `/listings` index
+(53k / 2,234 pages) or the sitemap (every slug, no price cut). Prefecture
+hubs (`/akiya-in-akita`) work but omit the numeric `listing_id`; prefer
+`/listings?prefecture=akita` if you want a regional slice (`jp-akita`, parked).
+
+The portal displays **USD** (JSON-LD `priceCurrency: USD`). We store
+`price` + `currency=EUR` using a documented fixed rate (`akiyaportal/fx.py`,
+0.85 EUR/USD and 170 JPY/EUR — not a live ECB feed) and keep the original
+amount in `raw_fields`. `external_id` is the portal's numeric `listing_id`.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
-`ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk. Each CLI only runs its
-own source. `akiyaportal` is not in this tree yet.
+`ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk; `akiyaportal/` scrapes
+akiyaportal.com. Each CLI only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -216,6 +250,7 @@ core/export.py      SQLite → packed JSON + static UI at repo root
 core/serve.py       localhost UI + JSON API
 core/adapter.py     SourceAdapter protocol / registry
 ok_bulgaria/        cheap-bulgarian-house.co.uk adapter + CLI
+akiyaportal/        akiyaportal.com adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
