@@ -6,7 +6,8 @@ Akiya Portal, Holprop, Abruzzo Property Italy, and Abruzzo Rural Property.
 Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
-to get wrong.
+to get wrong. Home-IP checklist (Holprop cannot run from a datacenter):
+`PLAYBOOK.md`.
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 
@@ -16,12 +17,16 @@ Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 python3 -m franimo.scrape                 # 1a. franimo list + detail pages
 python3 -m ok_bulgaria.scrape             # 1b. OK Bulgaria (separate process; do not parallelise hosts)
 python3 -m akiyaportal.scrape             # 1c. Akiya Portal (separate process)
-python3 -m holprop.scrape                 # 1d. Holprop (separate process)
+python3 -m holprop.scrape                 # 1d. Holprop — home IP only (Cloudflare)
 python3 -m abruzzopropertyitaly.scrape    # 1e. Abruzzo Property Italy (separate process)
 python3 -m abruzzoruralproperty.scrape    # 1f. Abruzzo Rural Property (separate process)
-python3 -m franimo.export                 # 2. rebuild index.html + data/*.json
+python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
+
+Franimo is optional if France is already fresh. Export last — one combined
+`data/` for every source (bron facet). Full home-IP order, `--no-details`
+first, and the parked searches you may flip on: `PLAYBOOK.md`.
 
 Run `python3 -m franimo.serve` (http://localhost:8765) to check it locally first.
 Pages serves from `main` at the repo root, so the site files must stay at the root.
@@ -47,7 +52,8 @@ store.
 
 **The database is `db/franimo.db`,** not `data/`. `data/` is the published JSON.
 Rows are unique on `(source, external_id)`. `id` is an internal integer — do
-not assume it equals the portal id once a second source exists.
+not assume it equals the portal id once a second source exists. Point
+experiments at `--db db/scratch.db` so a trial cannot trash the real file.
 
 **`searches.json` `"source"`** selects the adapter. Omitted source means
 `franimo`. `python3 -m franimo.scrape` only runs franimo searches;
