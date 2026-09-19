@@ -4,8 +4,9 @@ A better way to browse cheap property listings. Today that means
 [franimo.nl](https://www.franimo.nl) (Dutch portal for French property),
 [OK Bulgaria](https://www.cheap-bulgarian-house.co.uk/) (UK-facing Bulgarian
 houses), [Akiya Portal](https://akiyaportal.com/) (English listings of
-vacant houses in Japan), and [Holprop](https://www.holprop.com/) (multi-country
-foreigner portal). The scrape → SQLite → static page pipeline is
+vacant houses in Japan), [Holprop](https://www.holprop.com/) (multi-country
+foreigner portal), and [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com/)
+(English Abruzzo/Molise agency). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -41,11 +42,12 @@ python3 -m franimo.scrape          # enabled franimo searches
 python3 -m ok_bulgaria.scrape      # enabled OK Bulgaria searches
 python3 -m akiyaportal.scrape      # enabled Akiya Portal searches
 python3 -m holprop.scrape          # enabled Holprop searches
+python3 -m abruzzopropertyitaly.scrape  # enabled Abruzzo Property Italy searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan or Holprop.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop or Abruzzo.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -166,6 +168,8 @@ The current set:
 | `jp-akita` | Akiya Portal, Akita prefecture | ~1.2k | parked |
 | `hp-es-houses-100k` | **Holprop Spain houses ≤ €100k** | ~68 | active |
 | `hp-bg-houses-100k` / `hp-pt-houses-100k` / `hp-gr-houses-100k` / `hp-it-houses-100k` | Holprop other countries, same €100k house filter |  | parked |
+| `api-houses-100k` | **Abruzzo Property Italy ≤ €100k** | ~155 | active |
+| `api-houses-50k` / `api-houses-150k` | same site, €50k / €150k bands |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -280,11 +284,60 @@ Canonical detail URLs keep `?ctype=EUR` so a re-fetch does not flip currency.
 Some networks get a Cloudflare challenge on the first request; a cached page
 (sha1 of the full URL under `cache/`) re-parses with zero requests.
 
+## Abruzzo Property Italy
+
+[abruzzopropertyitaly.com](https://www.abruzzopropertyitaly.com/) is an
+English-language Abruzzo/Molise agency. Public list/detail pages only.
+Anonymous datacenter GET works (Cloudflare is present but does not challenge).
+`robots.txt` is content-signals only — no path Disallow.
+
+```sh
+python3 -m abruzzopropertyitaly.scrape api-houses-100k --no-details --max-pages 1   # trial
+python3 -m abruzzopropertyitaly.scrape api-houses-100k --no-details                 # all 4 list pages
+python3 -m abruzzopropertyitaly.scrape api-houses-100k --detail-limit 20            # then details
+python3 -m abruzzopropertyitaly.scrape api-houses-50k --no-details --max-pages 1    # parked 50k, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`). Default
+gap is 0.6s and default workers is 1 — be kind; do not run this in parallel
+with another scrape of the same host.
+
+The search CMS uses a **tilde path**, not a query string. GET of
+
+`/property-search~for=1,minprice=0,maxprice=100000,order=priceasc,do=search`
+
+returns the filtered HTML. A `?minprice=` query on `/property-search` is
+ignored (you get the unfiltered 333). `order=priceasc` is cheapest first
+(pid 3223 Prezza €12k on 2026-09-19). `type=1` / `type[]=1` are not a
+usable house filter in this URL shape — `type=1` returns zero rows —
+so the seed is the site's own ≤€100k bucket (all types).
+
+Verified live on 2026-09-19:
+
+| search | listings | pages |
+|---|---|---|
+| `api-houses-100k` (enabled) | 155 | 4 |
+| `api-houses-50k` (parked) | 50 | 1 |
+| `api-houses-150k` (parked) | 196 | 4 |
+
+50 cards per page. Pagination is 0-based (`page=1` is the second page);
+page 1 omits `page=` so cache keys match the URL the site serves. The
+site's own pager links drop the price filter (`~page=N,for=1`) — we
+never follow those; we keep `minprice` / `maxprice` / `order` / `do=search`
+and set `page=` ourselves.
+
+Detail ids are numeric pids:
+`/property-search~action=detail,pid=3223`. `external_id` is that pid.
+Prices are **EUR** asking prices. Sale pages still print a leftover
+"PCM" label next to the euro figure — we ignore it. 0.00 SQM on a card
+means "not stated", not a zero-area home.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
 `ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk; `akiyaportal/` scrapes
-akiyaportal.com; `holprop/` scrapes holprop.com. Each CLI only runs its own source.
+akiyaportal.com; `holprop/` scrapes holprop.com; `abruzzopropertyitaly/`
+scrapes abruzzopropertyitaly.com. Each CLI only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -302,6 +355,7 @@ core/adapter.py     SourceAdapter protocol / registry
 ok_bulgaria/        cheap-bulgarian-house.co.uk adapter + CLI
 akiyaportal/        akiyaportal.com adapter + CLI
 holprop/            holprop.com adapter + CLI
+abruzzopropertyitaly/  abruzzopropertyitaly.com adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
