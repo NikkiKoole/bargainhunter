@@ -56,10 +56,21 @@ CADASTRAL_RE = re.compile(
     r"Total\s+cadastral\s+space:\s*([\d][\d.,]*)\s*(?:sqm|sq\.?\s*m|m²)",
     re.I,
 )
+LIVEABLE_RE = re.compile(
+    r"Total\s+liveable\s+surface:\s*([\d][\d.,]*)\s*(?:sqm|sq\.?\s*m|m²)",
+    re.I,
+)
 PROVINCE_RE = re.compile(r"province of\s+([A-Za-zÀ-ÖØ-öø-ÿ'’\s-]+?)(?:\s+in\b|[.,;]|$)", re.I)
-REGION_RE = re.compile(r"\b(Abruzzo|Molise)\b", re.I)
+REGION_RE = re.compile(
+    r"(?:in the|in)\s+(Abruzzo|Molise)\s+region\b|\b(Abruzzo|Molise)\s+region\b",
+    re.I,
+)
+# Listing metas look like "Italy | Molise | Fossalto" or the shorter
+# "Italy | Abruzzo . € 45.000" (no town). Do not run this on raw HTML —
+# a `|` in a later tag would swallow the page.
 ITALY_LOC_RE = re.compile(
-    r"Italy\s*\|\s*([^|]+?)\s*\|\s*([^|.]+)", re.I
+    r"Italy\s*\|\s*(Abruzzo|Molise)(?:\s*\|\s*([^|.]+))?",
+    re.I,
 )
 STATUS_PRICE_RE = re.compile(r"\b(sold|under offer|reserved)\b", re.I)
 
@@ -365,34 +376,57 @@ def _photos(s: BeautifulSoup, page_url: str) -> list[str]:
     return photos
 
 
+def _listing_blob(s: BeautifulSoup) -> str:
+    """Text that belongs to this listing — not banners / nav / other cards."""
+    parts: list[str] = []
+    for meta in s.select("meta[name='description'], meta[property='og:description']"):
+        content = (meta.get("content") or "").strip()
+        if content and "Abruzzo Rural Property" not in content:
+            parts.append(content)
+    for sel in ("[itemprop=description]", "article.fw-property-detail-row",
+                ".fw-property-details"):
+        node = s.select_one(sel)
+        if node:
+            parts.append(node.get_text(" ", strip=True))
+    return " ".join(parts)
+
+
 def _italy_loc(html: str, s: BeautifulSoup) -> dict[str, str | None]:
     out: dict[str, str | None] = {"region": None, "place": None, "province": None}
     for meta in s.select("meta[name='description'], meta[property='og:description']"):
         content = meta.get("content") or ""
         m = ITALY_LOC_RE.search(content)
         if m:
-            out["region"] = m.group(1).strip()
-            out["place"] = m.group(2).strip(" .")
+            out["region"] = m.group(1).strip().title()
+            if m.group(2):
+                place = m.group(2).strip(" .")
+                # "Abruzzo . € 45.000" leaves an empty/price tail
+                if place and not place.startswith("€") and len(place) < 40:
+                    out["place"] = place
             break
-    blob = s.get_text(" ", strip=True)
+    blob = _listing_blob(s)
     pm = PROVINCE_RE.search(blob)
     if pm:
         out["province"] = re.sub(r"\s+", " ", pm.group(1)).strip()
     if not out["region"]:
         rm = REGION_RE.search(blob)
         if rm:
-            out["region"] = rm.group(1)
+            out["region"] = (rm.group(1) or rm.group(2)).title()
     return out
 
 
 def _living_m2(fields: dict[str, str], desc: str | None) -> int | None:
-    for key in ("total cadastral space", "cadastral space", "cadastral area"):
+    for key in ("total cadastral space", "cadastral space", "cadastral area",
+                "total liveable surface"):
         if fields.get(key):
             n = _european_int(fields[key])
             if n:
                 return n
     if desc:
         m = CADASTRAL_RE.search(desc)
+        if m:
+            return _european_int(m.group(1))
+        m = LIVEABLE_RE.search(desc)
         if m:
             return _european_int(m.group(1))
     return None
@@ -470,26 +504,29 @@ def parse_detail(html: str, url: str) -> dict[str, Any]:
         out["baths"] = _european_int(fields["bathrooms"])
 
     desc = None
-    block = None
-    for row in s.select("article.fw-property-detail-row, .fw-property-detail-row"):
-        label = (_txt(row.select_one(".text-bold")) or "").lower()
-        if "description" in label:
-            block = row
-            break
-    if block is None:
-        block = s.select_one(".fw-property-details")
-    if block:
-        desc = block.get_text("\n", strip=True)
+    desc_el = s.select_one("[itemprop=description]")
+    if desc_el:
+        desc = desc_el.get_text("\n", strip=True)
+    else:
+        block = None
+        for row in s.select("article.fw-property-detail-row, .fw-property-detail-row"):
+            label = (_txt(row.select_one(".text-bold, .text-bold-DESCRIPTION")) or "").lower()
+            if "description" in label:
+                block = row
+                break
+        if block:
+            desc = block.get_text("\n", strip=True)
+            lines = desc.split("\n")
+            if lines and re.search(r"property description", lines[0], re.I):
+                desc = "\n".join(lines[1:]).strip()
+    if desc:
         desc = re.sub(r"\n{3,}", "\n\n", desc)
-        # Drop the "Property Description" heading if it's the first line.
-        lines = desc.split("\n")
-        if lines and re.search(r"property description", lines[0], re.I):
-            desc = "\n".join(lines[1:]).strip()
     out["description"] = desc or None
     out["snippet"] = (desc.split("\n", 1)[0] if desc else None) or _txt(s.h1)
 
-    out["living_m2"] = _living_m2(fields, desc)
-    out["land_m2"] = _land_m2(fields, desc)
+    area_blob = " ".join(x for x in (desc, _listing_blob(s)) if x)
+    out["living_m2"] = _living_m2(fields, area_blob)
+    out["land_m2"] = _land_m2(fields, desc) or _land_m2(fields, area_blob)
 
     if fields.get("amenities"):
         out["features"] = fields["amenities"]

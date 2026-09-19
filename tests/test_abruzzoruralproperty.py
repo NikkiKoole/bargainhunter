@@ -141,6 +141,29 @@ class DetailParser(unittest.TestCase):
         self.assertNotIn("lat", d)
         self.assertNotIn("lon", d)
 
+    def test_short_italy_loc_and_description_heading(self):
+        html = """
+        <html><head>
+        <meta name="description" content="Town house. Italy | Abruzzo . € 45.000 Ref.: CAR5859"/>
+        </head><body>
+        <h1>Town house. Carunchio</h1>
+        <span class="bold-price">Price: €45.000</span>
+        <div class="fw-property-details">
+        <div class="fw-property-detail-row-odd"><div class="text-bold">City:</div>
+        <span itemprop="addressLocality">Carunchio</span></div>
+        <article class="fw-property-detail-row">
+        <div class="text-bold-DESCRIPTION">Property Description</div>
+        <div itemprop="description"><p>Ready to live in, in the Abruzzo region of Italy.</p></div>
+        </article>
+        </div></body></html>
+        """
+        d = parse_detail(html, NOLAND_URL)
+        self.assertEqual(d["price"], 45000)
+        self.assertEqual(d["place"], "Carunchio")
+        self.assertEqual(d["dept_nl"], "Abruzzo")
+        self.assertIn("Ready to live in", d["description"])
+        self.assertNotIn("Property Description", d["description"] or "")
+
     def test_no_land_and_stale_og_price(self):
         d = parse_detail(_html("detail_noland.html"), NOLAND_URL)
         self.assertEqual(d["external_id"], "183")
