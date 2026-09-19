@@ -1,6 +1,6 @@
 """Source adapter contract.
 
-Adapters (franimo, ok_bulgaria, akiyaportal, holprop, abruzzopropertyitaly, abruzzoruralproperty, …) implement this and register themselves.
+Adapters (franimo, ok_bulgaria, akiyaportal, holprop, abruzzopropertyitaly, abruzzoruralproperty, centrarium, …) implement this and register themselves.
 A search in searches.json points at an adapter via `"source"`. Existing
 entries that omit it are treated as `"franimo"`.
 """

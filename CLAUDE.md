@@ -2,7 +2,8 @@
 
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
-Akiya Portal, Holprop, Abruzzo Property Italy, and Abruzzo Rural Property.
+Akiya Portal, Holprop, Abruzzo Property Italy, Abruzzo Rural Property,
+and Centrarium.
 Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
@@ -20,6 +21,7 @@ python3 -m akiyaportal.scrape             # 1c. Akiya Portal (separate process)
 python3 -m holprop.scrape                 # 1d. Holprop — home IP only (Cloudflare)
 python3 -m abruzzopropertyitaly.scrape    # 1e. Abruzzo Property Italy (separate process)
 python3 -m abruzzoruralproperty.scrape    # 1f. Abruzzo Rural Property (separate process)
+python3 -m centrarium.scrape              # 1g. Centrarium (separate process; 5s crawl-delay)
 python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -37,7 +39,8 @@ Pages serves from `main` at the repo root, so the site files must stay at the ro
 is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
 OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy and
-Abruzzo Rural Property default to 0.6s / 1 worker.
+Abruzzo Rural Property default to 0.6s / 1 worker. Centrarium
+defaults to 5s / 1 worker (`robots.txt` Crawl-delay: 5).
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
 minutes and makes the UI usable; the detail backfill is the long pole (~3.3 pages/s).
@@ -63,7 +66,9 @@ experiments at `--db db/scratch.db` so a trial cannot trash the real file.
 `python3 -m abruzzopropertyitaly.scrape` only runs `abruzzopropertyitaly`
 (e.g. `api-houses-100k`);
 `python3 -m abruzzoruralproperty.scrape` only runs `abruzzoruralproperty`
-(e.g. `arp-houses-100k`).
+(e.g. `arp-houses-100k`);
+`python3 -m centrarium.scrape` only runs `centrarium`
+(e.g. `ct-me-houses-100k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -111,6 +116,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, price, currency, living_m2, land_m2
   FROM listings WHERE source='abruzzoruralproperty' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, price, currency, living_m2, land_m2
+  FROM listings WHERE source='centrarium' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -142,8 +151,8 @@ the browser, not stored, so a published build doesn't go stale.
 
 ## Adding a source adapter
 
-`ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly` and
-`abruzzoruralproperty` are in. Do not start Centrarium or Mubawab here.
+`ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly`,
+`abruzzoruralproperty` and `centrarium` are in. Do not start Mubawab here.
 Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
@@ -192,6 +201,17 @@ offer). Detail ids are numeric CMS ids (`/item/1792-…`). Agency refs
 (FL4245) are `reference`. Site-wide geo.position is the San Salvo
 office — do not store it as listing lat/lon. Complements
 abruzzopropertyitaly (different agency stock).
+
+Centrarium displays EUR on the EN lowprice list (`35 000 €`; JSON-LD
+`priceCurrency: EUR`). The seed is
+`/en/montenegro/sale/houses/lowprice-montenegro/` — the site's cheap-first
+house list, not a hard ≤€100k filter (same 826 listings as
+`/en/montenegro/sale/houses/`; page 23 is multi-million). `skip.above`
+is EUR 100000 (~43 cards on 2026-09-19). Detail ids are numeric
+(`/en/zabljak/…-64071.html`). `robots.txt` Crawl-delay is 5s;
+`Disallow: /*?page=` is an indexer rule (path `/page/2/` 404s) — follow
+the site's `?page=N` pager at 5s / 1 worker. Unfiltered `/houses/` can
+paint USD; prefer lowprice. Serbia / Albania lowprice URLs 404'd.
 
 ## Regenerating the locator map
 

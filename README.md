@@ -6,8 +6,9 @@ A better way to browse cheap property listings. Today that means
 houses), [Akiya Portal](https://akiyaportal.com/) (English listings of
 vacant houses in Japan), [Holprop](https://www.holprop.com/) (multi-country
 foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com/)
-(English Abruzzo/Molise agency), and [Abruzzo Rural Property](https://www.abruzzoruralproperty.com/)
-(second English Abruzzo/Molise agency). The scrape → SQLite → static page pipeline is
+(English Abruzzo/Molise agency), [Abruzzo Rural Property](https://www.abruzzoruralproperty.com/)
+(second English Abruzzo/Molise agency), and [Centrarium](https://centrarium.com/)
+(English Montenegro / Balkans houses). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -45,11 +46,12 @@ python3 -m akiyaportal.scrape      # enabled Akiya Portal searches
 python3 -m holprop.scrape          # enabled Holprop searches
 python3 -m abruzzopropertyitaly.scrape  # enabled Abruzzo Property Italy searches
 python3 -m abruzzoruralproperty.scrape  # enabled Abruzzo Rural Property searches
+python3 -m centrarium.scrape       # enabled Centrarium searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop or Abruzzo.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo or Centrarium.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -76,7 +78,8 @@ sqlite file so you do not write `db/franimo.db`.
 
 Holprop is blocked from datacenter IPs (Cloudflare). The one-host-at-a-time
 checklist is `PLAYBOOK.md`: franimo refresh optional → Bulgaria → Japan →
-Holprop (home IP) → both Abruzzo 100k searches → export last, and only when
+Holprop (home IP) → both Abruzzo 100k searches → Centrarium
+`ct-me-houses-100k` (5s crawl-delay) → export last, and only when
 you want Pages updated.
 
 ## Publishing a static copy
@@ -185,6 +188,8 @@ The current set:
 | `api-houses-50k` / `api-houses-150k` | same site, €50k / €150k bands |  | parked |
 | `arp-houses-100k` | **Abruzzo Rural Property ≤ €100k** | ~345 | active |
 | `arp-houses-150k` | same site, €150k band |  | parked |
+| `ct-me-houses-100k` | **Centrarium Montenegro houses ≤ €100k** | ~43 | active |
+| `ct-me-houses` | same site, all 826 houses (no price skip) |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -395,13 +400,48 @@ is that id; the agency ref (FL4245) is `reference`. Prices are **EUR**
 asking prices (€42.000). Site-wide `geo.position` is the San Salvo
 office, not the listing — we do not store it as lat/lon.
 
+## Centrarium
+
+[centrarium.com](https://centrarium.com/) is an English-language Balkans
+marketplace. The seed is Montenegro houses. Public list/detail pages only.
+Anonymous datacenter GET works (Cloudflare is present but does not challenge).
+`robots.txt` sets **Crawl-delay: 5** and disallows `/*?page=` (an indexer
+rule — path forms `/page/2/` and `/2/` 404). The site's own pager is
+`?page=N`; we follow it at 5s / 1 worker.
+
+```sh
+python3 -m centrarium.scrape ct-me-houses-100k --no-details --max-pages 1   # trial
+python3 -m centrarium.scrape ct-me-houses-100k --no-details                 # cheap pages only
+python3 -m centrarium.scrape ct-me-houses-100k --detail-limit 20            # then details
+python3 -m centrarium.scrape ct-me-houses --no-details --max-pages 1        # parked all-prices, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`).
+Default gap is **5s** (robots crawl-delay) and default workers is 1 — be
+kind; do not run this in parallel with another scrape of the same host.
+
+`/en/montenegro/sale/houses/lowprice-montenegro/` is the site's cheap-first
+house list, **not** a hard ≤€100k filter. Verified 2026-09-19: 826 listings
+/ 23 pages (36 per page) — the same catalogue as `/en/montenegro/sale/houses/`.
+Page 1 is €35k–€94k; page 2 crosses €100k; page 23 is €2.3M–€5.8M.
+`skip.above=100000` keeps ~43 cards. The scraper stops after a full page
+over that cap (cheap-first). Serbia / Albania `lowprice-*` URLs 404'd.
+
+Detail ids are numeric (`/en/zabljak/…-64071.html`). `external_id` is that
+id; the agency "Object ID" (8013) is `reference` when present. Prices are
+**EUR** asking prices (`35 000 €` / JSON-LD `priceCurrency: EUR`). The
+unfiltered `/houses/` first paint can show USD — prefer the lowprice path.
+List cards give living m² / rooms / bedrooms; land and lat/lon come from
+the detail page (plot line in the description, `addr_lat` / OSM).
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
 `ok_bulgaria/` scrapes cheap-bulgarian-house.co.uk; `akiyaportal/` scrapes
 akiyaportal.com; `holprop/` scrapes holprop.com; `abruzzopropertyitaly/`
 scrapes abruzzopropertyitaly.com; `abruzzoruralproperty/` scrapes
-abruzzoruralproperty.com. Each CLI only runs its own source.
+abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com. Each CLI
+only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -421,6 +461,7 @@ akiyaportal/        akiyaportal.com adapter + CLI
 holprop/            holprop.com adapter + CLI
 abruzzopropertyitaly/  abruzzopropertyitaly.com adapter + CLI
 abruzzoruralproperty/  abruzzoruralproperty.com adapter + CLI
+centrarium/         centrarium.com adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first

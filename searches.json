@@ -183,5 +183,22 @@
     "note": "Same GET slider, price_to=150000. Verified 2026-09-19: End start=360 (~61 pages). Parked; run by name.",
     "path": "/find-a-property/for-sale?search[price_from]=0&search[price_to]=150000&fwrealestate_update_search=1",
     "enabled": false
+  },
+  "ct-me-houses-100k": {
+    "source": "centrarium",
+    "label": "Centrarium Montenegro houses ≤ €100k",
+    "note": "centrarium.com EN lowprice house list /en/montenegro/sale/houses/lowprice-montenegro/. Verified 2026-09-19: same 826-house catalogue as /en/montenegro/sale/houses/ (23 pages × 36), sorted cheap-first — not a hard ≤€100k filter (page 1 €35k–€94k, page 2 crosses €100k, page 23 is €2.3M–€5.8M). skip.above keeps ~43 cards. robots.txt Crawl-delay: 5; Disallow /*?page= is an indexer rule (path /page/2/ 404s) so we follow the site's ?page=N pager. Anonymous datacenter GET works (Cloudflare present, no challenge).",
+    "path": "/en/montenegro/sale/houses/lowprice-montenegro/",
+    "skip": {
+      "priceless": true,
+      "above": 100000
+    }
+  },
+  "ct-me-houses": {
+    "source": "centrarium",
+    "label": "Centrarium Montenegro houses (all prices)",
+    "note": "Unfiltered /en/montenegro/sale/houses/ — same 826 listings as lowprice, default sort. Parked; run by name. EN first paint can show USD; prefer the lowprice path (EUR) plus skip.above.",
+    "path": "/en/montenegro/sale/houses/",
+    "enabled": false
   }
 }
