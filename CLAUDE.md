@@ -171,6 +171,19 @@ sort. Past examples: land plots echoing their parcel size into the living-area f
 (2,069 rows), Beaujolais vineyards listed as `huis` with 18,176 m² of "living space".
 Both only showed up at the top of the €/m² ranking.
 
+## The cache must survive being killed
+
+Cache writes are atomic (temp file + `os.replace`). They were not, and killing a
+scraper mid-write left truncated .gz files that failed that listing on every
+later run — 19 of them accumulated in one session. An unreadable entry is now
+treated as a miss and re-fetched rather than raising.
+
+Decoding trusts the bytes over the declared charset, but only when the document
+as a whole reads as UTF-8: `cheap-bulgarian-house.co.uk` declares windows-1251,
+is really UTF-8, and has ~14 stray bytes in a script tag. Note that `E2 80 93`
+is both a UTF-8 en-dash and the cp1251 bytes for the mojibake it turns into, so
+"does it decode without error" is not the test — "how much of it is damaged" is.
+
 ## Don't "fix" prices
 
 `parse.py` cleans implausible **areas** (see README → Data cleaning). It deliberately
@@ -366,6 +379,21 @@ benadering" otherwise.
 Known cosmetic limit: Lisbon falls ~2.5% of map width outside the Portuguese
 outline, because simplification smooths away the Tagus estuary. Portugal has no
 listings yet.
+
+## "Sold" has to be trustworthy
+
+`mark_gone` flags listings a search used to find and didn't this time. A run
+that ends early — fetch failure, page ceiling, `--max-pages` — reaches it too,
+and everything it never got to looks absent. `--max-pages 1` on Holprop used to
+report 11 of 20 listings sold when none had left the site.
+
+It now refuses when the run doesn't look complete: nothing seen at all, or fewer
+than 60% of the known listings seen while more than 5 are missing. It says so on
+stderr and returns 0. Ordinary churn still registers (30 of 1000, or 3 of 8).
+`force=True` overrides it.
+
+The guard lives in `core/db.py`, not in the thirteen `*/scrape.py` copies of the
+crawl loop, so a new adapter inherits it.
 
 ## Verifying the UI from an automation session
 

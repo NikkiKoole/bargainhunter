@@ -124,6 +124,33 @@ def priced_row(eur: int | None, gbp: int | None) -> dict[str, Any]:
     return {"price": None, "currency": "EUR", "raw_fields": raw}
 
 
+# The headline is where this site states floor area, and it lists several areas
+# in one line: "70 sqm derelict house, 30 sqm derelict barn, 1300 sqm plot".
+# Only the dwelling counts, so match per comma-separated clause and require a
+# dwelling noun in the same clause — a barn, a plot or a forest must not become
+# living space.
+_DWELLING = r"living|house|home|villa|bungalow|cottage|apartment|property"
+_NOT_DWELLING = re.compile(r"\b(barn|plot|land|forest|garage|shed|outbuilding|"
+                           r"annex|ruin(?:s)?|stable|orchard|meadow|yard)\b", re.I)
+_AREA_THEN_DWELLING = re.compile(
+    r"([\d][\d\s.,]*)\s*(?:sq\.?\s*m\.?|sqm|m2|m²)\s+"      # "70 sqm"
+    r"(?:[a-z-]+\s+){0,2}"                                      # "derelict "
+    r"(?:" + _DWELLING + r")\b",                                # "house"
+    re.I,
+)
+
+
+def _living_from_text(blob: str | None) -> int | None:
+    """First dwelling area stated in a headline, or None."""
+    for clause in re.split(r"[,;]", blob or ""):
+        if _NOT_DWELLING.search(clause):
+            continue
+        m = _AREA_THEN_DWELLING.search(clause)
+        if m:
+            return _int(m.group(1))
+    return None
+
+
 def _place_from_alt(alt: str | None) -> tuple[str | None, str | None]:
     """'property, house in NIKOLAEVKA, VARNA, Bulgaria' -> (village, province)."""
     if not alt:
@@ -391,9 +418,8 @@ def parse_detail(html: str, url: str) -> dict[str, Any]:
 
     living = None
     for blob in (headline, title):
-        m = re.search(r"([\d][\d\s.,]*)\s*(?:sq\.?\s*m|sqm|m2|m²)\s+living", blob or "", re.I)
-        if m:
-            living = _int(m.group(1))
+        living = _living_from_text(blob)
+        if living is not None:
             break
     ptype_l = (out.get("type") or "").lower()
     is_land = ptype_l in LAND_TYPES or ptype_l.startswith("land")

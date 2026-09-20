@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -277,8 +278,44 @@ def update_from_detail(con: sqlite3.Connection, lid: int, detail: dict, ts: str)
                 [*(_encode(v) for v in data.values()), lid])
 
 
-def mark_gone(con: sqlite3.Connection, search: str, ts: str) -> int:
-    """Anything previously found by this search but absent from this run."""
+# A run that ends early — a fetch failure, the page ceiling, --max-pages —
+# still reaches mark_gone, and everything it never got to looks "absent". These
+# guards decide whether a run saw enough of the search to be believed.
+MIN_SEEN_FRACTION = 0.6      # below this, a run looks truncated rather than sold-out
+SMALL_ATTRITION = 5          # this few disappearing is ordinary churn at any size
+
+
+def mark_gone(con: sqlite3.Connection, search: str, ts: str, *,
+              force: bool = False) -> int:
+    """Flag listings this search used to find but didn't this time.
+
+    Refuses when the run doesn't look complete. Marking a live listing as sold
+    is far worse than missing one: the whole point of gone_at is that you can
+    trust it, and a truncated crawl (`--max-pages 1` on Holprop) otherwise
+    reports 11 of 20 listings as sold when none of them left the site.
+    """
+    seen = con.execute(
+        "SELECT COUNT(*) c FROM listing_search WHERE search=? AND last_seen=?",
+        (search, ts)).fetchone()["c"]
+    missing = con.execute(
+        "SELECT COUNT(*) c FROM listing_search WHERE search=? AND last_seen<>?",
+        (search, ts)).fetchone()["c"]
+    total = seen + missing
+
+    if not force and total:
+        why = None
+        if seen == 0:
+            why = "this run found nothing at all"
+        elif missing > SMALL_ATTRITION and seen < MIN_SEEN_FRACTION * total:
+            why = (f"this run saw {seen} of {total} known listings "
+                   f"({seen / total:.0%})")
+        if why:
+            print(f"  ! not marking {missing} listing(s) gone for {search}: {why}."
+                  f" A truncated crawl looks exactly like a sold-out portal;"
+                  f" re-run it complete, or pass force=True if this is real.",
+                  file=sys.stderr, flush=True)
+            return 0
+
     cur = con.execute("""
         UPDATE listings SET gone_at=?
         WHERE gone_at IS NULL

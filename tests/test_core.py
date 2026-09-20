@@ -8,7 +8,7 @@ from pathlib import Path
 
 from core.db import connect, now, update_from_detail, upsert_from_list
 from core.export import pack
-from core.http import Fetcher, cache_path
+from core.http import Fetcher, cache_path, decode
 from core.listing import Listing, identity
 from core.searches import DEFAULT_SOURCE, enabled_names, load_searches
 
@@ -187,6 +187,43 @@ class ClearLivingM2(unittest.TestCase):
             self.assertEqual(kept, 120)
 
 
+class Decode(unittest.TestCase):
+    """Small portals serve UTF-8 while declaring a legacy codepage."""
+
+    class _Resp:
+        def __init__(self, content, encoding, apparent="windows-1251"):
+            self.content, self.encoding, self.apparent_encoding = content, encoding, apparent
+
+    def test_utf8_body_wins_over_wrong_declared_charset(self):
+        r = self._Resp("Forest \u2013 70 km".encode("utf-8"), "windows-1251")
+        self.assertEqual(decode(r), "Forest \u2013 70 km")
+
+    def test_real_legacy_bytes_still_decode(self):
+        # Cyrillic in cp1251 is not valid UTF-8, so the declared charset is used.
+        word = "\u0411\u0443\u0440\u0433\u0430\u0441"          # Burgas
+        r = self._Resp(word.encode("windows-1251"), "windows-1251")
+        self.assertEqual(decode(r), word)
+
+    def test_missing_charset_falls_back(self):
+        r = self._Resp("plain".encode("utf-8"), None, None)
+        self.assertEqual(decode(r), "plain")
+
+    def test_a_few_stray_bytes_do_not_condemn_a_utf8_page(self):
+        # Real case: cheap-bulgarian-house.co.uk is UTF-8 apart from ~14 bytes
+        # inside a JavaScript string. Falling back to the declared cp1251 there
+        # mangled every en-dash in the page.
+        body = ("Forest \u2013 70 km from Sofia. " + "x" * 4000).encode("utf-8") + b"\x88"
+        r = self._Resp(body, "windows-1251")
+        out = decode(r)
+        self.assertIn("\u2013", out)
+        self.assertNotIn("\u0432\u0402", out)          # the "вЂ" mojibake
+
+    def test_a_genuinely_legacy_page_still_falls_back(self):
+        word = "\u0411\u0443\u0440\u0433\u0430\u0441 \u043a\u0440\u0430\u0439 \u043c\u043e\u0440\u0435\u0442\u043e"
+        r = self._Resp(word.encode("windows-1251"), "windows-1251")
+        self.assertEqual(decode(r), word)
+
+
 class Pack(unittest.TestCase):
     def test_pack_keeps_source_and_leaves_foreign_urls(self):
         packed = pack([{
@@ -309,3 +346,75 @@ class SourceLabels(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MarkGone(unittest.TestCase):
+    """gone_at has to be trustworthy: a truncated crawl looks exactly like a
+    sold-out portal, and calling a live listing sold is the worse error."""
+
+    # now() is second-resolution, so tests must supply distinct timestamps or
+    # "seen this run" and "seen last run" collapse into one.
+    def _seed(self, con, n, search="s", source="franimo", ts="2026-09-01T00:00:00+00:00"):
+        for i in range(n):
+            upsert_from_list(con, {"external_id": str(i), "url": f"u{i}", "price": 1000},
+                             search, ts, source=source)
+        return ts
+
+    def _see_again(self, con, ids, search="s", source="franimo",
+                   ts="2026-09-20T00:00:00+00:00"):
+        for i in ids:
+            upsert_from_list(con, {"external_id": str(i), "url": f"u{i}", "price": 1000},
+                             search, ts, source=source)
+        return ts
+
+    def test_truncated_run_marks_nothing(self):
+        from core.db import mark_gone
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            self._seed(con, 20)
+            ts = self._see_again(con, range(9))        # crawl stopped after page 1
+            self.assertEqual(mark_gone(con, "s", ts), 0)
+            still = con.execute("SELECT COUNT(*) c FROM listings WHERE gone_at IS NOT NULL")
+            self.assertEqual(still.fetchone()["c"], 0)
+
+    def test_run_that_found_nothing_marks_nothing(self):
+        from core.db import mark_gone
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            self._seed(con, 20)
+            self.assertEqual(mark_gone(con, "s", "2026-09-20T00:00:00+00:00"), 0)
+
+    def test_ordinary_churn_is_still_detected(self):
+        from core.db import mark_gone
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            self._seed(con, 1000)
+            ts = self._see_again(con, range(970))      # 30 sold over two weeks
+            self.assertEqual(mark_gone(con, "s", ts), 30)
+
+    def test_a_few_gone_from_a_tiny_search_is_detected(self):
+        from core.db import mark_gone
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            self._seed(con, 8)
+            ts = self._see_again(con, range(5))        # 3 of 8, below SMALL_ATTRITION
+            self.assertEqual(mark_gone(con, "s", ts), 3)
+
+    def test_force_overrides_the_guard(self):
+        from core.db import mark_gone
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            self._seed(con, 20)
+            ts = self._see_again(con, range(2))
+            self.assertEqual(mark_gone(con, "s", ts, force=True), 18)
+
+    def test_reappearing_listing_is_unmarked(self):
+        from core.db import mark_gone
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            self._seed(con, 8)
+            ts = self._see_again(con, range(5))
+            mark_gone(con, "s", ts)
+            self._see_again(con, range(8))             # it was only delisted briefly
+            back = con.execute("SELECT COUNT(*) c FROM listings WHERE gone_at IS NOT NULL")
+            self.assertEqual(back.fetchone()["c"], 0)

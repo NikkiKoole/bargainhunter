@@ -207,3 +207,29 @@ class Cli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LivingArea(unittest.TestCase):
+    """This site states floor area only in the headline, and lists several
+    areas in one line. Only the dwelling counts."""
+
+    def test_reads_the_dwelling_area(self):
+        from ok_bulgaria.parse import _living_from_text as f
+        self.assertEqual(f("100 sqm living space, 2700 sqm plot, 3 km to Greece"), 100)
+        self.assertEqual(f("90 sqm house for renovation, 2225 sqm land"), 90)
+        self.assertEqual(f("120 sqm villa, 400 sqm garden"), 120)
+
+    def test_ignores_barns_plots_and_forests(self):
+        from ok_bulgaria.parse import _living_from_text as f
+        # the barn and the plot must not become living space
+        self.assertEqual(f("70 sqm derelict house, 30 sqm derelict barn, 1300 sqm plot"), 70)
+        self.assertIsNone(f("2500 sq.m. Forest for Sale in a Picturesque Village"))
+        self.assertIsNone(f("1,201 sq.m Agricultural Land by River"))
+        # ambiguous: the area belongs to the plot, so claim nothing
+        self.assertIsNone(f("2700 sqm plot with house"))
+
+    def test_no_area_at_all(self):
+        from ok_bulgaria.parse import _living_from_text as f
+        self.assertIsNone(f("House for sale near Varna"))
+        self.assertIsNone(f(""))
+        self.assertIsNone(f(None))

@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import os
 import random
 import threading
 import time
+import zlib
 from pathlib import Path
 
 import requests
@@ -35,6 +37,34 @@ def cache_path(cache_dir: Path, url: str) -> Path:
     """Cached pages are gzipped: raw portal HTML is ~60KB and compresses
     to ~9KB, which matters once a search runs to five figures."""
     return cache_dir / (hashlib.sha1(url.encode()).hexdigest() + ".html.gz")
+
+
+def decode(response) -> str:
+    """Decode a response, trusting the bytes over the declared charset.
+
+    Small portals often serve UTF-8 while their headers claim a legacy
+    codepage; cheap-bulgarian-house.co.uk declares windows-1251 and en-dashes
+    came back as "вЂ“". The byte sequence is genuinely ambiguous — E2 80 93 is
+    both a UTF-8 en-dash and the cp1251 bytes for that mojibake — so the test
+    is whether the document as a whole reads as UTF-8, not whether it decodes
+    without a single error.
+    """
+    raw = response.content
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+
+    # A few stray bytes shouldn't condemn the whole document to a legacy
+    # codepage: cheap-bulgarian-house.co.uk is UTF-8 apart from ~14 bytes
+    # inside a JavaScript string, and falling back on those mangled every real
+    # UTF-8 character in the page. Keep UTF-8 when the damage is negligible.
+    lossy = raw.decode("utf-8", errors="replace")
+    if lossy.count("\ufffd") <= max(2, len(lossy) // 100):
+        return lossy
+
+    enc = response.encoding or response.apparent_encoding or "utf-8"
+    return raw.decode(enc, errors="replace")
 
 
 class Fetcher:
@@ -71,7 +101,11 @@ class Fetcher:
 
     @staticmethod
     def _write(path: Path, html: str) -> None:
-        path.write_bytes(gzip.compress(html.encode("utf-8"), 6))
+        """Write atomically: a scraper killed mid-write used to leave a
+        truncated .gz behind, and that listing then failed on every later run."""
+        tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+        tmp.write_bytes(gzip.compress(html.encode("utf-8"), 6))
+        os.replace(tmp, path)
 
     def get(self, url: str) -> str:
         url = self.resolve(url)
@@ -81,8 +115,15 @@ class Fetcher:
         if hit is not None and not self.refresh:
             fresh = self.max_age is None or (time.time() - hit.stat().st_mtime) < self.max_age
             if fresh:
-                self.hits += 1
-                return self._read(hit)
+                try:
+                    html = self._read(hit)
+                except (OSError, gzip.BadGzipFile, EOFError, zlib.error):
+                    # Unreadable cache entry: drop it and fetch again rather
+                    # than failing this listing forever.
+                    hit.unlink(missing_ok=True)
+                else:
+                    self.hits += 1
+                    return html
 
         html = self._download(url)
         self._write(path, html)
@@ -102,8 +143,7 @@ class Fetcher:
             try:
                 r = self.session.get(url, timeout=30)
                 r.raise_for_status()
-                r.encoding = r.encoding or "utf-8"
-                return r.text
+                return decode(r)
             except Exception as e:  # noqa: BLE001 - retry anything transient
                 last_err = e
                 time.sleep(2 ** attempt + random.random())
