@@ -38,6 +38,7 @@ into one database and serves a single dense page you can sort, filter and map.
 
 Working on this with an agent? `CLAUDE.md` has the order of operations and the
 traps; this file is the reference. Home-IP scrape checklist: `PLAYBOOK.md`.
+Agent on the laptop (home IP, real `db/` + `cache/`): `HOME_HANDOFF.md`.
 
 ## Setup
 
@@ -91,7 +92,8 @@ sqlite file so you do not write `db/franimo.db`.
 ## When you're home
 
 Holprop and Le Figaro Immobilier are blocked from datacenter IPs
-(Cloudflare). The one-host-at-a-time
+(Cloudflare). Agent picking this up on the laptop: `HOME_HANDOFF.md`.
+The one-host-at-a-time
 checklist is `PLAYBOOK.md`: franimo refresh optional → Bulgaria → Japan →
 Holprop (home IP) → both Abruzzo 100k searches → Centrarium
 `ct-me-houses-100k` (5s crawl-delay) → Mubawab `mw-ma-houses-100k` →

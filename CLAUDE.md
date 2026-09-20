@@ -10,7 +10,8 @@ in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
 to get wrong. Home-IP checklist (Holprop and Le Figaro Immobilier
 cannot run from a datacenter; Green-Acres listing GET works):
-`PLAYBOOK.md`.
+`PLAYBOOK.md`. Agent on the laptop (home IP, real `db/` + `cache/`):
+`HOME_HANDOFF.md`.
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 
