@@ -114,6 +114,7 @@ td.place{max-width:190px;overflow:hidden;text-overflow:ellipsis}
 .locator .pin{fill:var(--accent);stroke:var(--panel);stroke-width:4}
 .locator .pin-halo{fill:var(--accent);fill-opacity:.2}
 .locator figcaption{color:var(--dim);font-size:12px}
+.locator-plain{color:var(--dim);font-size:13px;margin:14px 0}
 
 .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:12px 0}
 .shots img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;background:var(--panel2)}

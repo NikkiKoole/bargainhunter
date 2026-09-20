@@ -64,6 +64,52 @@ when `VisitorCountry=us`). The parsers convert; do not "fix" prices.
 
 Franimo is optional if France is already fresh.
 
+## Where this stands — 2026-09-20
+
+Last full home run. Published to https://mipolai.com/bargainhunter/ on the same
+day. 17,970 listings, 8 countries.
+
+| source | land | rijen | details | met m² |
+|---|---|---|---|---|
+| `franimo` | FR | 10,129 | 10,129 | 63% |
+| `akiyaportal` | JP | 5,577 | 200 (+5,377 te doen) | 98% |
+| `ok_bulgaria` | BG | 1,300 | 1,300 | 25% |
+| `mubawab` | MA | 355 | 355 | 100% |
+| `abruzzoruralproperty` | IT | 272 | 272 | 6% |
+| `abruzzopropertyitaly` | IT | 155 | 155 | 89% |
+| `homege` | GE | 71 | 71 | 95% |
+| `centrarium` | ME | 43 | 43 | 100% |
+| `bulgarianproperties` | BG | 37 | 37 | 100% |
+| `holprop` | ES | 20 | 20 | 90% |
+| `domaza` | ME | 11 | 11 | 100% |
+
+**Unfinished, in priority order:**
+
+1. **akiyaportal detail backfill: 5,377 outstanding.** Resume with
+   `python3 -m akiyaportal.scrape jp-houses-10k --detail-limit 500`, repeat.
+   Not urgent: 98% already have m² from the list cards, so €/m² works; details
+   add description and photos.
+2. **Green-Acres has never been run here** (`ga-fr-houses-150k`, ~3,435 over 144
+   list pages, 1s crawl-delay). Deliberately skipped — it overlaps franimo on
+   France.
+3. **`abruzzoruralproperty` living area: 6%.** Not a parser bug. That portal has
+   no living-area field at all; the number is in prose in 86% of descriptions,
+   mixed with cadastral and land areas ("800 sqm of land", "cadastral area of
+   116 sqm"). Extracting it means deciding which area a sentence means. Left
+   alone on purpose — a wrong guess silently corrupts the €/m² ranking.
+
+**Known source-data quirks — do not "fix" these:**
+
+* Akiya Portal publishes 221 listings under €100 (€54 for a 300 m² house). The
+  portal's own page title says "$63". Our parser is faithful; their data is
+  wrong. Sub-€1,000 rows will top any €/m² sort.
+* A dozen Côte d'Azur listings from one franimo agent are rentals in a sale
+  feed; the agent's own reference ends in `L` for *location*.
+
+**Le Figaro is parked and will stay parked** until someone changes the fetch
+strategy — see the box above. Do not re-test it from home; that experiment is
+done.
+
 ## Enabled seeds (from `searches.json` on main)
 
 `"enabled": false` is skipped by a bare `python3 -m <pkg>.scrape`.
@@ -134,6 +180,11 @@ full seed is a parser or skip-rule bug, not "the site was empty".
 `ORDER BY eur_m2` looks absurd (vineyard living-m², land echoing the
 parcel), the *data* is wrong. Do not "fix" prices — surface source
 errors.
+
+**gone_at is guarded.** `mark_gone` refuses to flag listings sold when a run
+looks truncated (nothing seen, or under 60% of known listings while more than 5
+are missing) and says so on stderr. If you see that message, the run was
+incomplete — re-run it, don't force it.
 
 **UI bron facet.** `python3 -m franimo.serve` → http://localhost:8765.
 The bron facet must show friendly names (`SOURCE_NAMES` in

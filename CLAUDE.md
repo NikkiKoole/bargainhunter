@@ -15,6 +15,10 @@ cannot run from a datacenter; Green-Acres listing GET works):
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
 
+**Picking this up cold?** `HOME_HANDOFF.md` → "Where this stands" has the last
+run's per-source counts, what is still unfinished, and the source-data quirks
+that look like bugs but aren't. Read that before deciding what to scrape.
+
 ## Refreshing the data — the whole sequence
 
 ```sh

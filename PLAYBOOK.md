@@ -25,6 +25,7 @@ here).
 9. Bulgarian Properties `bp-bg-under-10k` (static under-£10k browse; ~37)
 10. Domaza `dz-me-houses` (enable AL / RS / GE if you want them)
 12. Green-Acres `ga-fr-houses-150k` (1s crawl-delay; `mx_p` + skip.above)
+    — never run from home yet, see HOME_HANDOFF.md
 13. **only then** export, and only when you want Pages updated
 
 ## Commands
@@ -92,6 +93,12 @@ python3 -m greenacres.scrape ga-fr-houses-150k --detail-limit 200
 # parked, by name (or flip "enabled" in searches.json first):
 # python3 -m greenacres.scrape ga-23-houses-150k --no-details
 # python3 -m greenacres.scrape ga-fr-houses --no-details
+```
+
+Resuming a capped backfill (akiyaportal is the one outstanding):
+
+```sh
+python3 -m akiyaportal.scrape jp-houses-10k --detail-limit 500   # repeat until 0 left
 ```
 
 Look before you publish:
