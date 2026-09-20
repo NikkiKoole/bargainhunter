@@ -66,13 +66,14 @@ Franimo is optional if France is already fresh.
 
 ## Where this stands — 2026-09-20
 
-Last full home run. Published to https://mipolai.com/bargainhunter/ on the same
-day. 17,970 listings, 8 countries.
+Last full home run, including the akiyaportal detail backfill. Published to
+https://mipolai.com/bargainhunter/ the same day. 17,970 listings, 8 countries,
+every listing detail-fetched except Green-Acres, which has never run.
 
 | source | land | rijen | details | met m² |
 |---|---|---|---|---|
 | `franimo` | FR | 10,129 | 10,129 | 63% |
-| `akiyaportal` | JP | 5,577 | 200 (+5,377 te doen) | 98% |
+| `akiyaportal` | JP | 5,577 | 5,577 | 98% |
 | `ok_bulgaria` | BG | 1,300 | 1,300 | 25% |
 | `mubawab` | MA | 355 | 355 | 100% |
 | `abruzzoruralproperty` | IT | 272 | 272 | 6% |
@@ -85,18 +86,18 @@ day. 17,970 listings, 8 countries.
 
 **Unfinished, in priority order:**
 
-1. **akiyaportal detail backfill: 5,377 outstanding.** Resume with
-   `python3 -m akiyaportal.scrape jp-houses-10k --detail-limit 500`, repeat.
-   Not urgent: 98% already have m² from the list cards, so €/m² works; details
-   add description and photos.
-2. **Green-Acres has never been run here** (`ga-fr-houses-150k`, ~3,435 over 144
+1. **Green-Acres has never been run here** (`ga-fr-houses-150k`, ~3,435 over 144
    list pages, 1s crawl-delay). Deliberately skipped — it overlaps franimo on
    France.
-3. **`abruzzoruralproperty` living area: 6%.** Not a parser bug. That portal has
+2. **`abruzzoruralproperty` living area: 6%.** Not a parser bug. That portal has
    no living-area field at all; the number is in prose in 86% of descriptions,
    mixed with cadastral and land areas ("800 sqm of land", "cadastral area of
    116 sqm"). Extracting it means deciding which area a sentence means. Left
    alone on purpose — a wrong guess silently corrupts the €/m² ranking.
+
+3. **akiyaportal has almost no plot size** (10 of 5,577). The portal states
+   floor area but rarely land, so €/m² grond is empty for Japan. Not a parser
+   bug as far as anyone has checked; nobody has looked hard.
 
 **Known source-data quirks — do not "fix" these:**
 
