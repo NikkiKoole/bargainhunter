@@ -7,7 +7,9 @@ so two scrapers at the same site double the request rate. Do not export until
 the scrapes you want are in `db/franimo.db`.
 
 `README.md` is the reference; `CLAUDE.md` is the traps. This file is the
-checklist.
+checklist. Agent picking this up on the laptop: `HOME_HANDOFF.md`
+(why home IP, enabled vs parked seeds, success criteria — commands stay
+here).
 
 ## Order
 
