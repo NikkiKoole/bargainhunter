@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .geo import country_for
 from .listing import DEFAULT_CURRENCY, DEFAULT_SOURCE, as_row, identity
 from .paths import DB_PATH, ROOT
 
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS listings (
     id              INTEGER PRIMARY KEY,
     source          TEXT NOT NULL DEFAULT 'franimo',
     external_id     TEXT,
+    country         TEXT,
     url             TEXT,
     type            TEXT,
     place           TEXT,
@@ -161,6 +163,26 @@ def _backfill_source(con: sqlite3.Connection) -> None:
     if "currency" in have:
         con.execute("UPDATE listings SET currency=? WHERE currency IS NULL OR currency=''",
                     (DEFAULT_CURRENCY,))
+    if "country" in have:
+        _backfill_country(con)
+
+
+def _backfill_country(con: sqlite3.Connection) -> None:
+    """Rows scraped before the country column: take what the portal said, else
+    the adapter's home country."""
+    rows = con.execute(
+        "SELECT id, source, raw_fields FROM listings "
+        "WHERE country IS NULL OR country=''").fetchall()
+    for r in rows:
+        raw = {}
+        if r["raw_fields"]:
+            try:
+                raw = json.loads(r["raw_fields"]) or {}
+            except (TypeError, ValueError):
+                raw = {}
+        code = country_for({"raw_fields": raw}, r["source"] or DEFAULT_SOURCE)
+        if code:
+            con.execute("UPDATE listings SET country=? WHERE id=?", (code, r["id"]))
 
 
 def _encode(value: Any) -> Any:
@@ -192,6 +214,9 @@ def upsert_from_list(con: sqlite3.Connection, row: dict, search: str, ts: str,
     data["source"] = src
     data["external_id"] = external_id
     data["currency"] = row.get("currency") or DEFAULT_CURRENCY
+    code = country_for(row, src)
+    if code:
+        data["country"] = code
     data["last_seen"] = ts
     data["gone_at"] = None
 

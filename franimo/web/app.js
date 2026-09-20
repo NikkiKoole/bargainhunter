@@ -329,25 +329,44 @@ function renderMap(rows) {
 
 // ---------- locator map ----------
 
+const COUNTRY_NAMES = {
+  FR: 'Frankrijk', IT: 'Italië', ES: 'Spanje', PT: 'Portugal', GR: 'Griekenland',
+  BG: 'Bulgarije', ME: 'Montenegro', RS: 'Servië', AL: 'Albanië', MA: 'Marokko',
+  GE: 'Georgië', JP: 'Japan',
+};
+
 // "Ardeche" vs "Ardèche", "Paris (Seine)" vs "Paris": match on a folded name.
 const fold = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/\s*\(.*\)\s*/g, '').trim().toLowerCase();
 
 let DEPT_BY_NAME = null;
 function deptPath(name) {
-  if (!window.FRANCE) return null;
+  const fr = window.MAPS && MAPS.FR;
+  if (!fr || !fr.depts) return null;
   if (!DEPT_BY_NAME) {
     DEPT_BY_NAME = {};
-    for (const [n, d] of Object.entries(FRANCE.depts)) DEPT_BY_NAME[fold(n)] = d;
+    for (const [n, d] of Object.entries(fr.depts)) DEPT_BY_NAME[fold(n)] = d;
   }
   return DEPT_BY_NAME[fold(name)] || null;
 }
 
 function locator(r) {
-  if (!window.FRANCE) return '';
-  const { w, h, proj, depts } = FRANCE;
-  const all = Object.values(depts).join(' ');
-  const mine = deptPath(r.dept_fr) || deptPath(r.dept_nl);
+  const code = r.country;
+  const map = window.MAPS && code ? MAPS[code] : null;
+  const where = [r.place, r.region || r.dept_fr || r.dept_nl].filter(Boolean).join(', ');
+  const countryName = COUNTRY_NAMES[code] || '';
+
+  // No outline for this country: say where it is rather than drawing the wrong
+  // country. A France map under a Japanese akiya is worse than no map.
+  if (!map) {
+    return where || countryName
+      ? `<p class="locator-plain">${[where, countryName].filter(Boolean).join(' · ')}</p>`
+      : '';
+  }
+
+  const { w, h, proj } = map;
+  // Departement shading is France-only; nothing else ships subdivisions.
+  const mine = code === 'FR' ? (deptPath(r.dept_fr) || deptPath(r.dept_nl)) : null;
 
   let dot = '';
   const inFrame = r.lat != null && r.lon != null
@@ -356,19 +375,21 @@ function locator(r) {
   if (inFrame) {
     const x = (r.lon * proj.kx - proj.minx) / (proj.maxx - proj.minx) * w;
     const y = (proj.maxy - r.lat) / (proj.maxy - proj.miny) * h;
-    dot = `<circle class="pin-halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="26"/>
-           <circle class="pin" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11"/>`;
+    dot = `<circle class="pin-halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(w / 38).toFixed(1)}"/>
+           <circle class="pin" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(w / 90).toFixed(1)}"/>`;
   }
+
+  const caption = [where, countryName].filter(Boolean).join(' · ');
+  const note = (!inFrame && !mine) ? ' — ligging bij benadering' : '';
 
   return `<figure class="locator">
     <svg viewBox="0 0 ${w} ${h}" role="img"
-         aria-label="ligging in Frankrijk: ${r.place || ''} ${r.dept_fr || ''}">
-      <path class="land" d="${all}"/>
+         aria-label="ligging: ${caption || countryName}">
+      <path class="land" d="${map.path}"/>
       ${mine ? `<path class="dept" d="${mine}"/>` : ''}
       ${dot}
     </svg>
-    <figcaption>${r.dept_fr || r.dept_nl || ''}${inFrame ? '' :
-      ' — buiten het Franse vasteland'}</figcaption>
+    <figcaption>${caption}${note}</figcaption>
   </figure>`;
 }
 

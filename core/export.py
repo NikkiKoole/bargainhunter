@@ -109,7 +109,7 @@ def main(argv=None) -> int:
     data = out / "data"
     data.mkdir(parents=True, exist_ok=True)
 
-    for name in ("app.js", "style.css", "france.js"):
+    for name in ("app.js", "style.css", "maps.js"):
         shutil.copy2(WEB / name, out / name)
 
     # The same page, told to read files instead of the API.

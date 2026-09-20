@@ -341,11 +341,41 @@ A `/makelaar/` slug is the agency-listing template, not an agency
 profile. Complements franimo and lefigaro (rural/lifestyle stock);
 overlap is expected — store `source=greenacres`, do not merge.
 
-## Regenerating the locator map
+## The locator map is per country
 
-Only needed if the outline changes. Source data is not vendored; `france.js` is
-committed:
+`franimo/web/maps.js` holds outlines for 12 countries (Natural Earth, public
+domain) plus France's 96 departements (france-geojson, IGN, Licence Ouverte).
+Regenerate with `python3 -m franimo.make_map --world <ne_50m_admin_0_countries>
+--departements <departements-version-simplifiee>`; the output is committed so
+there is no build step.
 
-```sh
-python3 -m franimo.make_map path/to/departements-version-simplifiee.geojson
-```
+Every listing has a `country` (ISO-2), resolved in `core/geo.py`: what the
+portal said in `raw_fields.country` first (the only reliable answer for
+multi-country portals like Holprop and Domaza), then the adapter's home country
+from `SOURCE_COUNTRY`. **Add an entry to `SOURCE_COUNTRY` when you add an
+adapter**, or its listings get no map.
+
+Only France ships subdivisions, so only France highlights a departement.
+A listing whose country has no outline shows its place and country as text —
+drawing the wrong country is worse than drawing none.
+
+Coordinates are sparse outside France (akiyaportal and ok_bulgaria have none),
+so the pin is drawn only when lat/lon exist; the caption says "ligging bij
+benadering" otherwise.
+
+Known cosmetic limit: Lisbon falls ~2.5% of map width outside the Portuguese
+outline, because simplification smooths away the Tagus estuary. Portugal has no
+listings yet.
+
+## Verifying the UI from an automation session
+
+A backgrounded tab (`document.hidden === true`) freezes CSS transitions and
+times out `Page.captureScreenshot`. That looks exactly like a broken drawer or a
+hung renderer and is neither. Check `document.visibilityState` before believing
+it, and verify geometry by clearing the transition
+(`el.style.transition = 'none'`) and reading `getBoundingClientRect()`.
+
+The maps can be checked without looking at them: project a known city and call
+`isPointInFill` on the country path. 11 of 12 capitals land inside; see above
+for the twelfth.
+
