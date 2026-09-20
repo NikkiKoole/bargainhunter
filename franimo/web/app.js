@@ -56,6 +56,7 @@ const SOURCE_NAMES = {
   bulgarianproperties: 'Bulgarian Properties',
   domaza: 'Domaza',
   lefigaro: 'Le Figaro',
+  greenacres: 'Green-Acres',
 };
 const SOURCE_ORDER = Object.keys(SOURCE_NAMES);
 

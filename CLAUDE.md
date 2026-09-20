@@ -3,13 +3,13 @@
 Scrapes property portals into SQLite and publishes a static browser at
 https://mipolai.com/bargainhunter/. Live sources: franimo.nl, OK Bulgaria,
 Akiya Portal, Holprop, Abruzzo Property Italy, Abruzzo Rural Property,
-Centrarium, Mubawab, home.ge, Bulgarian Properties, Domaza, and
-Le Figaro Immobilier.
+Centrarium, Mubawab, home.ge, Bulgarian Properties, Domaza,
+Le Figaro Immobilier, and Green-Acres.
 Shared HTTP/DB/export live
 in `core/` so adapters plug in without rewriting that path. `README.md` is the
 reference; this file is the order of operations and the things that are easy
 to get wrong. Home-IP checklist (Holprop and Le Figaro Immobilier
-cannot run from a datacenter):
+cannot run from a datacenter; Green-Acres listing GET works):
 `PLAYBOOK.md`.
 
 Stdlib + `requests`/`beautifulsoup4`/`lxml` only. No build step, no framework.
@@ -29,6 +29,7 @@ python3 -m homege.scrape                  # 1i. home.ge Georgia (separate proces
 python3 -m bulgarianproperties.scrape     # 1j. Bulgarian Properties (separate process)
 python3 -m domaza.scrape                  # 1k. Domaza (separate process)
 python3 -m lefigaro.scrape                # 1l. Le Figaro Immobilier — home IP only (Cloudflare)
+python3 -m greenacres.scrape              # 1m. Green-Acres (separate process; 1s crawl-delay)
 python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
@@ -47,7 +48,8 @@ is a process-wide lock, so two processes double the request rate at the host.
 Chain runs; don't parallelise them. Franimo's CLI defaults to 0.3s / 4 workers;
 OK Bulgaria, Akiya Portal, Holprop, Abruzzo Property Italy,
 Abruzzo Rural Property, Mubawab, home.ge, Bulgarian Properties,
-Domaza and Le Figaro Immobilier default to 0.6s / 1 worker. Centrarium defaults to 5s / 1 worker
+Domaza and Le Figaro Immobilier default to 0.6s / 1 worker. Green-Acres defaults to 1s / 1 worker
+(`robots.txt` Crawl-delay: 1). Centrarium defaults to 5s / 1 worker
 (`robots.txt` Crawl-delay: 5).
 
 **List pages first on anything large.** `--no-details` finishes a 500-page search in
@@ -84,7 +86,8 @@ experiments at `--db db/scratch.db` so a trial cannot trash the real file.
 `python3 -m bulgarianproperties.scrape` only runs `bulgarianproperties`
 (e.g. `bp-bg-under-10k`);
 `python3 -m domaza.scrape` only runs `domaza` (e.g. `dz-me-houses`);
-`python3 -m lefigaro.scrape` only runs `lefigaro` (e.g. `lf-23-houses-150k`).
+`python3 -m lefigaro.scrape` only runs `lefigaro` (e.g. `lf-23-houses-150k`);
+`python3 -m greenacres.scrape` only runs `greenacres` (e.g. `ga-fr-houses-150k`).
 
 **Sizing a search before scraping it** is one read-only request:
 ```sh
@@ -156,6 +159,10 @@ sqlite3 -box db/franimo.db "
 sqlite3 -box db/franimo.db "
   SELECT source, external_id, place, region, dept_fr, price, currency, living_m2, land_m2
   FROM listings WHERE source='lefigaro' ORDER BY price LIMIT 10;"
+
+sqlite3 -box db/franimo.db "
+  SELECT source, external_id, place, region, dept_fr, price, currency, living_m2, land_m2
+  FROM listings WHERE source='greenacres' ORDER BY price LIMIT 10;"
 ```
 
 If the top of that list looks absurd, something is wrong with the *data*, not the
@@ -189,7 +196,7 @@ the browser, not stored, so a published build doesn't go stale.
 
 `ok_bulgaria`, `akiyaportal`, `holprop`, `abruzzopropertyitaly`,
 `abruzzoruralproperty`, `centrarium`, `mubawab`, `homege`,
-`bulgarianproperties`, `domaza` and `lefigaro` are in.
+`bulgarianproperties`, `domaza`, `lefigaro` and `greenacres` are in.
 Each adapter is its own package that:
 
 * implements `core.adapter.SourceAdapter` (`parse_list` / `parse_detail`) and
@@ -315,6 +322,23 @@ home-IP run confirms them. Detail ids are numeric
 Cloudflare-blocked — home IP only, same class of wall as Holprop.
 Complements franimo (domestic FR agency/particulier stock);
 overlap is expected — store `source=lefigaro`, do not merge.
+
+Green-Acres displays EUR for a European visitor and USD from a
+datacenter IP. We convert with the documented rate in
+`greenacres/fx.py` (0.87 EUR/USD — the portal's own dual display
+`$107,417` → `€93,500`; not a live ECB feed) and keep `$` in
+`raw_fields`. The seed is the NL house list
+`/onroerend-goed?searchQuery=lg-nl-cn-fr-hab_house-on-mx_p-150000`
+— verified 2026-09-20: `prc_max` is ignored (still 56,805 houses);
+`mx_p-150000` cuts to 3,435. `skip.above` is EUR 150000. Featured /
+relevance paints luxury first; the scraper paginates
+`/nl/AdvertListingActions/AdvertsListing` with `order=price_i`.
+`robots.txt` Crawl-delay is 1s; `Disallow: */AdvertListingActions/AdvertsListing`
+and `/*currency=` are indexer rules. Detail ids are
+`At19xxy8r4yirjpy`-style (`data-advertid`; URL in base64 `data-o`).
+A `/makelaar/` slug is the agency-listing template, not an agency
+profile. Complements franimo and lefigaro (rural/lifestyle stock);
+overlap is expected — store `source=greenacres`, do not merge.
 
 ## Regenerating the locator map
 
