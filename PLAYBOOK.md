@@ -22,7 +22,8 @@ checklist.
 9. Bulgarian Properties `bp-bg-under-10k` (static under-£10k browse; ~37)
 10. Domaza `dz-me-houses` (enable AL / RS / GE if you want them)
 11. Le Figaro Immobilier `lf-23-houses-150k` (home IP; Cloudflare)
-12. **only then** export, and only when you want Pages updated
+12. Green-Acres `ga-fr-houses-150k` (1s crawl-delay; `mx_p` + skip.above)
+13. **only then** export, and only when you want Pages updated
 
 ## Commands
 
@@ -86,6 +87,13 @@ python3 -m lefigaro.scrape lf-23-houses-150k --detail-limit 200
 # python3 -m lefigaro.scrape lf-58-houses-150k --no-details
 # python3 -m lefigaro.scrape lf-23-petit-prix --no-details
 # python3 -m lefigaro.scrape lf-23-travaux --no-details
+
+# 12. Green-Acres — NL /onroerend-goed. prc_max is ignored; mx_p works.
+python3 -m greenacres.scrape ga-fr-houses-150k --no-details
+python3 -m greenacres.scrape ga-fr-houses-150k --detail-limit 200
+# parked, by name (or flip "enabled" in searches.json first):
+# python3 -m greenacres.scrape ga-23-houses-150k --no-details
+# python3 -m greenacres.scrape ga-fr-houses --no-details
 ```
 
 Look before you publish:
@@ -109,7 +117,12 @@ pages; drop the cap. Browse URLs only — `*page=` and `/Search/` are
 robots Disallow. Le Figaro's enabled seed is the Creuse house SEO
 path (~1 125 / 47 pages, mixed prices); `skip.above` is EUR 150000.
 Home IP only — datacenter is Cloudflare-blocked. Do not seed a
-France-wide list (page 100 hard stop).
+France-wide list (page 100 hard stop). Green-Acres' enabled seed
+is the NL house list with `mx_p-150000` (~3,435 / 144 pages);
+`prc_max` is ignored. Featured/relevance paints luxury — the
+scraper paginates AdvertsListing with `order=price_i`. `skip.above`
+is EUR 150000. Crawl-delay 1s. Complements franimo / Figaro
+(overlap expected; do not merge).
 
 **Never delete `cache/`.** Every fetched page is gzipped, keyed by sha1(full
 URL). `--redetail` re-parses from disk with zero requests. Do not move cache
@@ -134,7 +147,7 @@ must not become the published payload.
 The UI is already multi-source: source badge + **bron** facet. One export
 packs every row in the database — franimo, Bulgaria, Japan, Holprop, both
 Abruzzo agencies, Centrarium, Mubawab, home.ge, Bulgarian Properties,
-Domaza, Le Figaro Immobilier. There is no per-source publish step.
+Domaza, Le Figaro Immobilier, Green-Acres. There is no per-source publish step.
 
 Export when you want https://mipolai.com/bargainhunter/ updated, not after
 every scrape:
@@ -171,6 +184,8 @@ want it in the default pass.
 | `lf-58-houses-150k` | lefigaro | Nièvre maisons, same €150k skip |
 | `lf-23-petit-prix` / `lf-23-travaux` | lefigaro | Creuse `?option=` facets; confirm on a home IP |
 | `lf-france-houses` | lefigaro | France-wide maisons — page 100 hard stop |
+| `ga-fr-houses` | greenacres | all 56k France houses, no mx_p |
+| `ga-23-houses-150k` | greenacres | Creuse department, same €150k skip |
 
 ```sh
 python3 -m ok_bulgaria.scrape bg-houses-100k --no-details
@@ -188,6 +203,8 @@ python3 -m bulgarianproperties.scrape bp-bg-houses --no-details
 python3 -m domaza.scrape dz-rs-houses --no-details
 python3 -m lefigaro.scrape lf-58-houses-150k --no-details
 python3 -m lefigaro.scrape lf-23-petit-prix --no-details
+python3 -m greenacres.scrape ga-23-houses-150k --no-details
+python3 -m greenacres.scrape ga-fr-houses --no-details
 ```
 
 `jp-akita` and `api-houses-50k` are also parked (regional / narrower). Same

@@ -353,5 +353,33 @@
     "note": "Unfiltered /annonces/immobilier-vente-maison-france.html. Huge — the portal stops at page 100, so a France-wide crawl silently loses its tail. Parked (volume); prefer a department SEO path plus skip.above. Home IP — Cloudflare.",
     "path": "/annonces/immobilier-vente-maison-france.html",
     "enabled": false
+  },
+  "ga-fr-houses-150k": {
+    "source": "greenacres",
+    "label": "Green-Acres France huizen ≤ €150k",
+    "note": "green-acres.fr NL path /onroerend-goed?searchQuery=lg-nl-cn-fr-hab_house-on-mx_p-150000. Verified 2026-09-20: hab_house-on is 56,805 houses; prc_max-150000 is ignored (same 56,805); mx_p-150000 cuts to 3,435 (24/page, ~144 pages). Featured/relevance paints luxury first — the scraper paginates /nl/AdvertListingActions/AdvertsListing with order=price_i (page 2 of that sort is €18k). robots.txt Disallow AdvertsListing and /*currency= are indexer rules; Crawl-delay: 1. Datacenter HTML may paint $ (VisitorCountry=us) — we convert at 0.87 and prefer Prijs in euros on detail. skip.above is EUR 150000 (belt and braces: mx_p can be USD-valued on a US cookie). Complements franimo + lefigaro (rural/lifestyle stock; overlap expected — store source=greenacres, do not merge). Anonymous datacenter GET of the listing API works (reCAPTCHA is on contact forms).",
+    "path": "/onroerend-goed?searchQuery=lg-nl-cn-fr-hab_house-on-mx_p-150000",
+    "skip": {
+      "priceless": true,
+      "above": 150000
+    }
+  },
+  "ga-fr-houses": {
+    "source": "greenacres",
+    "label": "Green-Acres France huizen (all prices)",
+    "note": "House filter without mx_p — 56,805 listings / ~2,367 pages on 2026-09-20. Parked (volume); prefer the mx_p band plus skip.above. Featured/relevance is luxury-first.",
+    "path": "/onroerend-goed?searchQuery=lg-nl-cn-fr-hab_house-on",
+    "enabled": false
+  },
+  "ga-23-houses-150k": {
+    "source": "greenacres",
+    "label": "Green-Acres Creuse huizen ≤ €150k",
+    "note": "Department SEO /onroerend-goed/creuse (city_id=dp_23). Verified 2026-09-20: 206 listings, mixed prices. Parked; run by name. skip.above is EUR 150000.",
+    "path": "/onroerend-goed/creuse",
+    "enabled": false,
+    "skip": {
+      "priceless": true,
+      "above": 150000
+    }
   }
 }

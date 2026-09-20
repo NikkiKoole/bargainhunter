@@ -12,9 +12,11 @@ foreigner portal), [Abruzzo Property Italy](https://www.abruzzopropertyitaly.com
 (English/French Morocco houses), [home.ge](https://www.home.ge/en/)
 (English Georgia houses), [Bulgarian Properties](https://www.bulgarianproperties.com/)
 (English Bulgaria houses), [Domaza](https://www.domaza.com/)
-(Balkans multi-country portal), and
+(Balkans multi-country portal),
 [Le Figaro Immobilier](https://immobilier.lefigaro.fr/)
-(domestic French agency/particulier stock). The scrape → SQLite → static page pipeline is
+(domestic French agency/particulier stock), and
+[Green-Acres](https://www.green-acres.fr/onroerend-goed)
+(NL/EN rural/lifestyle France houses). The scrape → SQLite → static page pipeline is
 shared; each portal is a `core.adapter` package. Scrapes saved searches
 into one database and serves a single dense page you can sort, filter and map.
 
@@ -58,11 +60,12 @@ python3 -m homege.scrape           # enabled home.ge searches
 python3 -m bulgarianproperties.scrape  # enabled Bulgarian Properties searches
 python3 -m domaza.scrape           # enabled Domaza searches
 python3 -m lefigaro.scrape         # enabled Le Figaro Immobilier searches
+python3 -m greenacres.scrape       # enabled Green-Acres searches
 python3 -m franimo.serve           # open http://localhost:8765
 ```
 
 Each CLI only runs searches for its own `"source"`. A bare
-`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge, Bulgarian Properties, Domaza or Le Figaro.
+`python3 -m franimo.scrape` will not touch Bulgaria, Japan, Holprop, Abruzzo, Centrarium, Mubawab, home.ge, Bulgarian Properties, Domaza, Le Figaro or Green-Acres.
 
 Re-running the scraper is cheap and safe. Fetched pages are cached in `cache/`, so a
 second run re-parses from disk instead of hitting the site, and every DB write is an
@@ -96,6 +99,7 @@ home.ge `hg-ge-houses-100k` →
 Bulgarian Properties `bp-bg-under-10k` →
 Domaza `dz-me-houses` →
 Le Figaro Immobilier `lf-23-houses-150k` (home IP; Cloudflare) →
+Green-Acres `ga-fr-houses-150k` →
 export last, and only when you want Pages updated.
 
 ## Publishing a static copy
@@ -214,6 +218,10 @@ The current set:
 | `bp-bg-rural-houses` / `bp-bg-houses` | same site, 830 rural houses / all 1,173 houses |  | parked |
 | `dz-me-houses` | **Domaza Montenegro houses** (ingest ≤ €100k) | ~100 | active |
 | `dz-al-houses` / `dz-rs-houses` / `dz-ge-houses` | Domaza Albania / Serbia / Georgia — thin, leftover foreign cards |  | parked |
+| `lf-23-houses-150k` | **Le Figaro Creuse maisons ≤ €150k** | ~1.1k | active |
+| `lf-58-houses-150k` / `lf-23-petit-prix` / `lf-23-travaux` / `lf-france-houses` | Figaro other depts / facets / France-wide |  | parked |
+| `ga-fr-houses-150k` | **Green-Acres France huizen ≤ €150k** | ~3.4k | active |
+| `ga-fr-houses` / `ga-23-houses-150k` | same site, all-price houses / Creuse |  | parked |
 | `breed-oost` | 240km around the Ardennes | ~6.8k | parked |
 | `annecy-300` | 300km around Annecy | ~14.2k | parked |
 | `morvan-60` | 60km around Château-Chinon/Saulieu | ~574 | parked |
@@ -726,6 +734,70 @@ from ItemList ld+json; DPE, agent, description and photos come
 from the detail page. `dept_fr` / `dept_nl` are the French
 department name (Creuse) so the locator map highlights.
 
+## Green-Acres
+
+[green-acres.fr](https://www.green-acres.fr/onroerend-goed) is the
+NL/EN rural/lifestyle portal (Green-Acres / Vizzit). France
+complement #2 after Figaro: agency stock that franimo and Figaro
+do not fully cover. Listings **may overlap** both — they are stored
+as `source=greenacres` and are **not** merged across portals. Public
+list/detail pages plus the site's own `AdvertsListing` pager. Language
+on the seed is NL (`/onroerend-goed`); currency is EUR (datacenter
+HTML may paint `$`).
+
+`robots.txt` Crawl-delay is 1s. `Disallow: */AdvertListingActions/AdvertsListing`
+and `/*currency=` are indexer rules — the site's own pager is that
+JSON endpoint (`html`, `advertsCount`, cards). We follow it at 1s / 1
+worker and never put `currency=` on a URL. `prog_show_properties` is
+disallowed and unused. Detail URLs hide in base64 `data-o` on each
+`.announce-card`; `data-advertid` is the id (`At19xxy8r4yirjpy`). A
+`/makelaar/` slug is the agency-listing template, not an agency
+profile.
+
+**`prc_max` is ignored.** A 2026-09-19/20 probe of
+`searchQuery=…-prc_max-150000` still returned 56,805 houses. The
+working token is `mx_p-150000` (3,435 houses / ~144 pages). Featured
+/ relevance sort paints Côte d'Azur luxury first — the scraper
+paginates AdvertsListing with `order=price_i` (cheap end ~€18k,
+including the odd garage the house filter leaks). `skip.above` is
+EUR 150000 at ingest so a re-scrape cannot undo a prune if `mx_p`
+is USD-valued on a US cookie.
+
+```sh
+python3 -m greenacres.scrape ga-fr-houses-150k --no-details --max-pages 1   # trial
+python3 -m greenacres.scrape ga-fr-houses-150k --no-details                 # all ~144 list pages
+python3 -m greenacres.scrape ga-fr-houses-150k --detail-limit 20            # then details
+python3 -m greenacres.scrape ga-23-houses-150k --no-details --max-pages 1   # parked Creuse, by name
+```
+
+Same flags as franimo (`--refresh`, `--redetail`, `--gap`, `--workers`).
+Default gap is 1.0s and default workers is 1 — be kind; do not run this
+in parallel with another scrape of the same host.
+
+The enabled seed is France houses on the NL path:
+
+`/onroerend-goed?searchQuery=lg-nl-cn-fr-hab_house-on-mx_p-150000`
+
+Verified 2026-09-20: **3,435** houses / ~144 pages (24 per page).
+`/huis` is a luxury SEO path (`mn_p-1000000`, 16k villas) — do not
+seed it. Datacenter GET of the listing API works (reCAPTCHA is on
+contact forms, not the card list).
+
+| search | listings | |
+|---|---|---|
+| `ga-fr-houses-150k` (enabled) | 3,435 France houses | mx_p + skip.above 150k |
+| `ga-fr-houses` (parked) | 56,805 houses, no mx_p | volume |
+| `ga-23-houses-150k` (parked) | Creuse department | same skip |
+
+Detail ids are alphanumeric
+(`/nl/properties/makelaar/la-souterraine/At19xxy8r4yirjpy.htm`).
+`external_id` is that id. List cards give price / living m² / terrein
+/ kamers; DPE, agent, description and photos come from the detail
+page. `dept_fr` / `dept_nl` are the French department name (Creuse)
+so the locator map highlights. Dollar cards convert at the
+documented 0.87 EUR/USD (`greenacres/fx.py`); detail `Prijs in euros`
+wins when present.
+
 ## Multi-source layout
 
 Shared infrastructure lives in `core/`. `franimo/` is the franimo.nl adapter;
@@ -737,7 +809,8 @@ abruzzoruralproperty.com; `centrarium/` scrapes centrarium.com;
 `homege/` scrapes home.ge;
 `bulgarianproperties/` scrapes bulgarianproperties.com;
 `domaza/` scrapes domaza.com;
-`lefigaro/` scrapes immobilier.lefigaro.fr. Each CLI only runs its own source.
+`lefigaro/` scrapes immobilier.lefigaro.fr;
+`greenacres/` scrapes green-acres.fr. Each CLI only runs its own source.
 
 Listings are stored under `(source, external_id)` so two portals cannot
 collide on the same numeric id. The integer `id` is an internal key (UI,
@@ -763,6 +836,7 @@ homege/             home.ge adapter + CLI
 bulgarianproperties/  bulgarianproperties.com adapter + CLI
 domaza/             domaza.com adapter + CLI
 lefigaro/           immobilier.lefigaro.fr adapter + CLI
+greenacres/         green-acres.fr adapter + CLI
 franimo/parse.py    franimo list-page and detail-page parsers
 franimo/scrape.py   franimo CLI (only runs source=franimo searches)
 franimo/newsearch.py  add a franimo radius search / size it up first
