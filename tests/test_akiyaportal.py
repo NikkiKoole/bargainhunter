@@ -246,3 +246,26 @@ class Cli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Description(unittest.TestCase):
+    """The real write-up is behind Akiya Portal's paid trial, so what we get is
+    a location line plus a sales pitch. The pitch is identical across ~5,570
+    listings and buried free-text search until it was stripped."""
+
+    def test_pitch_is_stripped(self):
+        from akiyaportal.parse import _clean_description as clean
+        got = clean("$63 property for sale in Amada, Inashiki City, Japan. "
+                    "Start a free trial for unlimited English property details.")
+        self.assertEqual(got, "$63 property for sale in Amada, Inashiki City, Japan.")
+
+    def test_pitch_only_becomes_nothing(self):
+        from akiyaportal.parse import _clean_description as clean
+        self.assertIsNone(clean("Start a free trial for unlimited English property details."))
+
+    def test_ordinary_text_is_untouched(self):
+        from akiyaportal.parse import _clean_description as clean
+        self.assertEqual(clean("Daisen City, Kawaiwa, 2-story, 7K"),
+                         "Daisen City, Kawaiwa, 2-story, 7K")
+        self.assertIsNone(clean(None))
+        self.assertIsNone(clean(""))

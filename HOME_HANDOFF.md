@@ -101,6 +101,14 @@ every listing detail-fetched except Green-Acres, which has never run.
 
 **Known source-data quirks — do not "fix" these:**
 
+* Akiya Portal's real write-ups are behind a paid trial. What the JSON-LD gives
+  is a price/location line, and it used to carry "Start a free trial for
+  unlimited English property details." on ~5,570 listings — which buried
+  free-text search, since "free", "trial" and "unlimited" each matched a third
+  of the database. The pitch is stripped at parse time; the location line is
+  kept because it carries a fuller address than `place`. Do not try to get
+  behind that paywall.
+
 * Akiya Portal publishes 221 listings under €100 (€54 for a 300 m² house). The
   portal's own page title says "$63". Our parser is faithful; their data is
   wrong. Sub-€1,000 rows will top any €/m² sort.

@@ -404,6 +404,20 @@ def _photos(s: BeautifulSoup, page_url: str) -> list[str]:
     return photos
 
 
+# The real write-up is behind Akiya Portal's paid trial, so the JSON-LD
+# description is a price/location line plus a sales pitch. The pitch is
+# identical on ~5,570 listings, which buried free-text search: "free", "trial"
+# and "unlimited" each matched a third of the whole database.
+_PITCH = re.compile(r"\s*Start a free trial[^.]*\.\s*$", re.I)
+
+
+def _clean_description(text: str | None) -> str | None:
+    if not text:
+        return None
+    cleaned = _PITCH.sub("", text).strip()
+    return cleaned or None
+
+
 def parse_detail(html: str, url: str) -> dict[str, Any]:
     s = _soup(html)
     out: dict[str, Any] = {"url": url, "source": SOURCE, "agent": "AkiyaPortal"}
@@ -504,7 +518,7 @@ def parse_detail(html: str, url: str) -> dict[str, Any]:
     raw["headline"] = name
     desc = ld.get("description")
     # JSON-LD description is often just the name; keep it as snippet-quality text
-    out["description"] = desc if desc and desc != name else name
+    out["description"] = _clean_description(desc if desc and desc != name else name)
     out["snippet"] = name
 
     photos = _photos(s, url)
