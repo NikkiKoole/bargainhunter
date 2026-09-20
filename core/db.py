@@ -229,14 +229,23 @@ def upsert_from_list(con: sqlite3.Connection, row: dict, search: str, ts: str,
 # value we stored earlier. Everything else is only ever filled in, never blanked.
 CLEARABLE = ("living_m2",)
 
+# ...but only for sources whose detail page *always* states living area, so that
+# a missing value genuinely means "there is none" (franimo: a land parcel).
+# Everywhere else a missing value only means "this page doesn't show it", and
+# clearing destroyed m² the list card had already supplied — akiyaportal went
+# from 99% coverage to 2.5% after its first 200 detail fetches.
+CLEARS_LIVING_M2 = {"franimo"}
+
 
 def update_from_detail(con: sqlite3.Connection, lid: int, detail: dict, ts: str) -> None:
     detail = as_row(detail)
     data = {k: detail.get(k) for k in DETAIL_COLS if detail.get(k) is not None}
     if detail.get("raw_fields"):           # we did parse the info table, so trust it
-        for col in CLEARABLE:
-            if detail.get(col) is None:
-                data[col] = None
+        row = con.execute("SELECT source FROM listings WHERE id=?", (lid,)).fetchone()
+        if row and row["source"] in CLEARS_LIVING_M2:
+            for col in CLEARABLE:
+                if detail.get(col) is None:
+                    data[col] = None
     data["detail_fetched"] = ts
     sets = ", ".join(f"{k}=?" for k in data)
     con.execute(f"UPDATE listings SET {sets} WHERE id=?",

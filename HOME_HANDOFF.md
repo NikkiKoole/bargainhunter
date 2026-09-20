@@ -1,8 +1,8 @@
 # Home-machine agent handoff
 
 You are on Nikki's laptop (home IP). This is the session that can
-touch Holprop, Le Figaro Immobilier, and the real `db/` + `cache/`.
-A Cursor datacenter / cloud VM cannot do that reliably.
+touch Holprop and the real `db/` + `cache/`. A Cursor datacenter /
+cloud VM cannot do that reliably.
 
 Read `CLAUDE.md`, `PLAYBOOK.md`, then this file. Commands live in
 `PLAYBOOK.md` — do not copy them here. This file is what is home-only
@@ -12,13 +12,21 @@ and how to know you are done.
 
 **Must be home IP** (datacenter GET is Cloudflare 403):
 
-* Holprop (`holprop.com`) — enabled seed `hp-es-houses-100k`
-* Le Figaro Immobilier (`immobilier.lefigaro.fr`) — enabled seed
-  `lf-23-houses-150k`
+* Holprop (`holprop.com`) — enabled seed `hp-es-houses-100k`. Confirmed
+  working from home on 2026-09-20.
 
-A failed fetch looks like `failed to fetch … 403` / Forbidden. Holprop
-prints `! stopping:`; Le Figaro prints `Cloudflare blocked this IP`.
-Stop. Do not retry those hosts from a datacenter.
+A failed fetch looks like `failed to fetch … 403` / Forbidden; Holprop
+prints `! stopping:`. Stop. Do not retry that host from a datacenter.
+
+> **Le Figaro is blocked everywhere, and a home IP does not help.** Verified
+> 2026-09-20 from Nikki's laptop: `requests` and `curl` get 403 on every path
+> including the site root, with a full browser header set. Real Chrome on the
+> same machine and the same IP loads the page normally. That makes it TLS
+> fingerprint bot detection, not an IP block. All `lf-*` seeds are parked. Do
+> not spend a session "trying from home" — that experiment is done. Getting it
+> would need a TLS-impersonating client or a real browser, which is a product
+> decision, not a retry.
+
 
 **Generally OK from a datacenter**, but a full production scrape +
 export belongs here, on this machine, against the real `db/franimo.db`
@@ -47,8 +55,8 @@ when `VisitorCountry=us`). The parsers convert; do not "fix" prices.
 4. **Real `db/` for production.** Default is `db/franimo.db`. Use
    `--db db/scratch.db` only for experiments. Do not point a trial
    at the production file.
-5. **Holprop + lefigaro must run on this IP.** Confirm Holprop first
-   (quick start below) before burning a 47-page Figaro crawl.
+5. **Holprop must run on this IP.** Confirm it first (quick start
+   below). Le Figaro is parked and unreachable from any IP.
 6. **Export last, and only when you mean to update Pages.**
    `python3 -m franimo.export` writes `data/` + root static files
    (`index.html`, `app.js`, `style.css`). Those packs are large.
@@ -78,7 +86,6 @@ moved; this table is the 2026-09-20 main snapshot.
 | `hg-ge-houses-100k` | homege | EUR GET filter; `skip.above` EUR 100000 |
 | `bp-bg-under-10k` | bulgarianproperties | static under-£10k; `skip.above` EUR 15000 |
 | `dz-me-houses` | domaza | Montenegro house list; `skip.above` EUR 100000 |
-| `lf-23-houses-150k` | lefigaro | Creuse maisons; `skip.above` EUR 150000 — **home IP** |
 | `ga-fr-houses-150k` | greenacres | NL `mx_p-150000`; `skip.above` EUR 150000 |
 
 ### Parked (`"enabled": false`)
@@ -99,11 +106,12 @@ Run by name, or flip `"enabled"` first. Why they are parked is in
 | `hg-ge-houses-150k`, `hg-ge-houses` | homege |
 | `bp-bg-rural-houses`, `bp-bg-houses` | bulgarianproperties |
 | `dz-al-houses`, `dz-rs-houses`, `dz-ge-houses` | domaza |
-| `lf-58-houses-150k`, `lf-23-petit-prix`, `lf-23-travaux`, `lf-france-houses` | lefigaro |
+| all `lf-*` (incl. `lf-23-houses-150k`) | lefigaro — Cloudflare, see above |
 | `ga-fr-houses`, `ga-23-houses-150k` | greenacres |
 
-Do not enable the France-wide Figaro list (`lf-france-houses`) — page
-100 hard stop, silent tail loss. Do not seed Domaza `/s/HASH` URLs.
+Do not re-enable any `lf-*` seed without a new fetch strategy; the
+France-wide one (`lf-france-houses`) also has a page-100 hard stop and
+silent tail loss. Do not seed Domaza `/s/HASH` URLs.
 
 ## After scrape — success criteria
 
@@ -131,7 +139,7 @@ errors.
 The bron facet must show friendly names (`SOURCE_NAMES` in
 `franimo/web/app.js`): Franimo, OK Bulgaria, Akiya Portal, Holprop,
 Abruzzo Property Italy, Abruzzo Rural, Centrarium, Mubawab, home.ge,
-Bulgarian Properties, Domaza, Le Figaro, Green-Acres. Raw keys
+Bulgarian Properties, Domaza, Green-Acres. Raw keys
 (`ok_bulgaria`) mean the label map drifted.
 
 **Do not overwrite Pages until she is happy.** Local `serve` against
@@ -155,6 +163,6 @@ python3 -m holprop.scrape hp-es-houses-100k --no-details --max-pages 1 --db db/s
 ```
 
 A page of cards printed → home IP is good; proceed with `PLAYBOOK.md`
-against the real `db/`. `403` / `failed to fetch` → stop Holprop and
-lefigaro. Everything else can still run, but production Holprop /
-Figaro wait until she is actually home.
+against the real `db/`. `403` / `failed to fetch` → stop Holprop.
+Everything else can still run, but production Holprop waits until she
+is actually home.

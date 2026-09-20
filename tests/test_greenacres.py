@@ -79,7 +79,7 @@ class Searches(unittest.TestCase):
         self.assertIn("france-150k", franimo)
         self.assertNotIn("ga-fr-houses-150k", franimo)
         lf = enabled_names(searches, source="lefigaro")
-        self.assertEqual(lf, ["lf-23-houses-150k"])
+        self.assertEqual(lf, [])          # all lf-* parked; see test_lefigaro
 
 
 class Pagination(unittest.TestCase):

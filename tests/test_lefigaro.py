@@ -47,7 +47,10 @@ class Searches(unittest.TestCase):
     def test_lf_entries(self):
         searches = load_searches()
         self.assertEqual(searches["lf-23-houses-150k"]["source"], "lefigaro")
-        self.assertTrue(searches["lf-23-houses-150k"].get("enabled", True))
+        # Parked 2026-09-20: Cloudflare 403s requests/curl from every IP,
+        # including home, while real Chrome on the same machine loads the page.
+        # Keep every lf-* seed disabled until the fetch strategy changes.
+        self.assertFalse(searches["lf-23-houses-150k"].get("enabled", True))
         self.assertIn(
             "/annonces/immobilier-vente-maison-creuse.html",
             searches["lf-23-houses-150k"]["path"],
@@ -64,7 +67,7 @@ class Searches(unittest.TestCase):
         self.assertIn("immobilier-vente-maison-france.html",
                       searches["lf-france-houses"]["path"])
         lf = enabled_names(searches, source="lefigaro")
-        self.assertEqual(lf, ["lf-23-houses-150k"])
+        self.assertEqual(lf, [])
         franimo = enabled_names(searches, source="franimo")
         self.assertIn("france-150k", franimo)
         self.assertNotIn("lf-23-houses-150k", franimo)

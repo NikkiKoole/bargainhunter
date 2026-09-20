@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.db import connect, now, upsert_from_list
+from core.db import connect, now, update_from_detail, upsert_from_list
 from core.export import pack
 from core.http import Fetcher, cache_path
 from core.listing import Listing, identity
@@ -136,6 +136,55 @@ class Store(unittest.TestCase):
             self.assertEqual(row["source"], "franimo")
             self.assertEqual(row["external_id"], "99")
             self.assertEqual(row["currency"], "EUR")
+
+
+class ClearLivingM2(unittest.TestCase):
+    """A detail page that doesn't mention living area must not erase the value
+    the list card already gave us.
+
+    Regression: CLEARABLE was global, so every adapter cleared living_m2 when a
+    detail page lacked it. akiyaportal's list cards carry m2 for 99% of rows;
+    after its first 200 detail fetches only 2.5% still had it.
+    """
+
+    def _row(self, con, source, living):
+        ts = now()
+        _, lid = upsert_from_list(
+            con,
+            {"external_id": "1", "url": f"https://x/{source}", "price": 1000,
+             "living_m2": living},
+            "s", ts, source=source)
+        return lid, ts
+
+    def test_other_source_keeps_card_living_m2(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            lid, ts = self._row(con, "akiyaportal", 80)
+            update_from_detail(con, lid, {"raw_fields": {"anything": "yes"}}, ts)
+            kept = con.execute("SELECT living_m2 FROM listings WHERE id=?",
+                               (lid,)).fetchone()["living_m2"]
+            self.assertEqual(kept, 80)
+
+    def test_franimo_still_clears(self):
+        # franimo's table always states living area, so a missing value there
+        # really does mean "no living space" (a land parcel).
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            lid, ts = self._row(con, "franimo", 80)
+            update_from_detail(con, lid, {"raw_fields": {"terrein": "900 m2"}}, ts)
+            kept = con.execute("SELECT living_m2 FROM listings WHERE id=?",
+                               (lid,)).fetchone()["living_m2"]
+            self.assertIsNone(kept)
+
+    def test_detail_value_still_wins(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            lid, ts = self._row(con, "akiyaportal", 80)
+            update_from_detail(con, lid,
+                               {"raw_fields": {"a": "b"}, "living_m2": 120}, ts)
+            kept = con.execute("SELECT living_m2 FROM listings WHERE id=?",
+                               (lid,)).fetchone()["living_m2"]
+            self.assertEqual(kept, 120)
 
 
 class Pack(unittest.TestCase):

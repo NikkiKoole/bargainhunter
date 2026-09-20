@@ -307,17 +307,18 @@
   "lf-23-houses-150k": {
     "source": "lefigaro",
     "label": "Le Figaro Creuse maisons ≤ €150k",
-    "note": "immobilier.lefigaro.fr department SEO path /annonces/immobilier-vente-maison-creuse.html — not a price query (priceMax was unreliable). Archive snapshot 2026: 1 125 maisons / ~47 pages (24 per page), mixed prices (page 1 has €19k next to €399k). skip.above is EUR 150000. Pagination is ?page=N (page 1 omits it) and stops at page 100. Complements franimo (domestic FR agency/particulier stock; overlap is expected — store source=lefigaro, do not merge). Datacenter GET is Cloudflare-blocked; home IP only, same class of wall as Holprop.",
+    "note": "immobilier.lefigaro.fr department SEO path /annonces/immobilier-vente-maison-creuse.html — not a price query (priceMax was unreliable). Archive snapshot 2026: 1 125 maisons / ~47 pages (24 per page), mixed prices (page 1 has €19k next to €399k). skip.above is EUR 150000. Pagination is ?page=N (page 1 omits it) and stops at page 100. Complements franimo (domestic FR agency/particulier stock; overlap is expected — store source=lefigaro, do not merge). Datacenter GET is Cloudflare-blocked; home IP only, same class of wall as Holprop.  [PARKED 2026-09-20: Cloudflare 403s requests/curl on every path including the site root, from a home IP as well as a datacenter. Real Chrome on the same machine and IP loads the page fine, so this is TLS-fingerprint bot detection, not an IP block — a home IP does not unlock it.]",
     "path": "/annonces/immobilier-vente-maison-creuse.html",
     "skip": {
       "priceless": true,
       "above": 150000
-    }
+    },
+    "enabled": false
   },
   "lf-58-houses-150k": {
     "source": "lefigaro",
     "label": "Le Figaro Nièvre maisons ≤ €150k",
-    "note": "Same department SEO shape for Nièvre (another cheap rural dept). Parked; run by name. skip.above is EUR 150000. Home IP — Cloudflare.",
+    "note": "Same department SEO shape for Nièvre (another cheap rural dept). Parked; run by name. skip.above is EUR 150000. Home IP — Cloudflare.  [PARKED 2026-09-20: Cloudflare 403s requests/curl on every path including the site root, from a home IP as well as a datacenter. Real Chrome on the same machine and IP loads the page fine, so this is TLS-fingerprint bot detection, not an IP block — a home IP does not unlock it.]",
     "path": "/annonces/immobilier-vente-maison-nievre.html",
     "enabled": false,
     "skip": {
@@ -328,7 +329,7 @@
   "lf-23-petit-prix": {
     "source": "lefigaro",
     "label": "Le Figaro Creuse maisons petit_prix",
-    "note": "Same Creuse house path with the site's ?option=petit_prix facet (robots-named option). Parked until a home-IP run confirms the filter is tight; skip.above still 150000 if it leaks. Do not replace with a priceMax query string.",
+    "note": "Same Creuse house path with the site's ?option=petit_prix facet (robots-named option). Parked until a home-IP run confirms the filter is tight; skip.above still 150000 if it leaks. Do not replace with a priceMax query string.  [PARKED 2026-09-20: Cloudflare 403s requests/curl on every path including the site root, from a home IP as well as a datacenter. Real Chrome on the same machine and IP loads the page fine, so this is TLS-fingerprint bot detection, not an IP block — a home IP does not unlock it.]",
     "path": "/annonces/immobilier-vente-maison-creuse.html?option=petit_prix",
     "enabled": false,
     "skip": {
@@ -339,7 +340,7 @@
   "lf-23-travaux": {
     "source": "lefigaro",
     "label": "Le Figaro Creuse maisons travaux",
-    "note": "Same Creuse house path with ?option=travaux. Parked; run by name after a home-IP check. skip.above is EUR 150000.",
+    "note": "Same Creuse house path with ?option=travaux. Parked; run by name after a home-IP check. skip.above is EUR 150000.  [PARKED 2026-09-20: Cloudflare 403s requests/curl on every path including the site root, from a home IP as well as a datacenter. Real Chrome on the same machine and IP loads the page fine, so this is TLS-fingerprint bot detection, not an IP block — a home IP does not unlock it.]",
     "path": "/annonces/immobilier-vente-maison-creuse.html?option=travaux",
     "enabled": false,
     "skip": {
@@ -350,7 +351,7 @@
   "lf-france-houses": {
     "source": "lefigaro",
     "label": "Le Figaro France maisons (all prices)",
-    "note": "Unfiltered /annonces/immobilier-vente-maison-france.html. Huge — the portal stops at page 100, so a France-wide crawl silently loses its tail. Parked (volume); prefer a department SEO path plus skip.above. Home IP — Cloudflare.",
+    "note": "Unfiltered /annonces/immobilier-vente-maison-france.html. Huge — the portal stops at page 100, so a France-wide crawl silently loses its tail. Parked (volume); prefer a department SEO path plus skip.above. Home IP — Cloudflare.  [PARKED 2026-09-20: Cloudflare 403s requests/curl on every path including the site root, from a home IP as well as a datacenter. Real Chrome on the same machine and IP loads the page fine, so this is TLS-fingerprint bot detection, not an IP block — a home IP does not unlock it.]",
     "path": "/annonces/immobilier-vente-maison-france.html",
     "enabled": false
   },
