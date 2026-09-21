@@ -86,16 +86,14 @@ every listing detail-fetched except Green-Acres, which has never run.
 
 **Unfinished, in priority order:**
 
-1. **Green-Acres stops at page 21.** Ran 2026-09-21: the site reports 195
-   pages (4,680 houses) but its own `AdvertsListing` pager 404s on `p_n=21`,
-   so only **479** listings are reachable — not the 3,435 the README documents.
-   Same shape as franimo's pagination ceiling. Price bands are the likely fix
-   and the URL builder already emits `mn_p`, but **nobody has verified `mn_p`
-   is honoured** — `prc_max` on this site is silently ignored, so assume
-   nothing. Band machinery currently lives only in `franimo/scrape.py` and is
-   shaped around `pricefrom=`/`priceto=`; Green-Acres uses a token string.
-
-2. **(was: Green-Acres has never been run here)** (`ga-fr-houses-150k`, ~3,435 over 144
+1. **(done 2026-09-21: Green-Acres, with price bands.)** Its pager 404s on
+   `p_n=21` whatever the query — 20 pages x 24 = 480 listings per search, full
+   stop. `mn_p` *is* honoured (unlike `prc_max`), so `greenacres/scrape.py`
+   now measures the search and splits the price range until every band fits:
+   15 bands, 4,654 listings instead of 479. It self-plans on each run, so a
+   shifting catalogue can't quietly cost you the tail. Two listings redirect to
+   leboncoin.fr and 403 — leave them; Leboncoin is a bot wall and out of
+   scope. (`ga-fr-houses-150k`, ~3,435 over 144
    list pages, 1s crawl-delay). Deliberately skipped — it overlaps franimo on
    France.
 3. **`abruzzoruralproperty` living area: 6%.** Not a parser bug. That portal has

@@ -384,6 +384,25 @@ Known cosmetic limit: Lisbon falls ~2.5% of map width outside the Portuguese
 outline, because simplification smooths away the Tagus estuary. Portugal has no
 listings yet.
 
+## Portals cap their pagers
+
+Three so far: franimo ~714 pages, Le Figaro 100, Green-Acres 20. Past the cap
+the tail is unreachable and the crawl ends quietly holding part of the
+catalogue — it does not error.
+
+`core/bands.py` splits a price range until each band fits under the cap, given
+a `pages_for(lo, hi)` probe. Adapters supply their own price rewriting, because
+the URL shapes differ: franimo uses `pricefrom=`/`priceto=` query params,
+Green-Acres a `mn_p-…-mx_p-…` token string. Green-Acres plans its bands at
+crawl time; franimo reads them from `searches.json`.
+
+**Check the filter is real before banding on it.** On Green-Acres `prc_max` is
+silently ignored while `mx_p` and `mn_p` work — band on an ignored filter and
+every band returns the same first 20 pages, which looks like success.
+
+A band of exactly the cap is *complete*, not truncated. Warn on
+`total_pages > CEILING`, not on pages crawled.
+
 ## "Sold" has to be trustworthy
 
 `mark_gone` flags listings a search used to find and didn't this time. A run

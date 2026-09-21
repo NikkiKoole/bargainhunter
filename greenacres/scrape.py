@@ -15,16 +15,40 @@ at `--db db/scratch.db`.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
 from core import db
+from core.bands import describe, split_bands
 from core.listing import DEFAULT_SOURCE
 from core.searches import enabled_names, load_searches
 
 from . import adapter as _adapter  # noqa: F401  — register greenacres
 from .http import BASE, DEFAULT_GAP, Fetcher
-from .parse import SOURCE, is_blocked, listing_api_url, parse_detail, parse_list
+from .parse import (SOURCE, _search_tokens, is_blocked, listing_api_url,
+                    parse_detail, parse_list)
+
+# The AdvertsListing pager 404s on p_n=21 whatever the query: 20 pages x 24
+# cards = 480 listings is all any single search can return. The catalogue is
+# ~4,700 houses, so the price range has to be split until each band fits.
+PAGE_CEILING = 20
+
+
+def with_prices(path: str, lo: int, hi: int) -> str:
+    """Set mn_p / mx_p in a green-acres searchQuery token string."""
+    def sub(m):
+        tokens = re.sub(r"-?\bmn_p-\d+", "", m.group(1))
+        tokens = re.sub(r"-?\bmx_p-\d+", "", tokens)
+        return "searchQuery=" + tokens.strip("-") + f"-mn_p-{lo}-mx_p-{hi}"
+    return re.sub(r"searchQuery=([^&]*)", sub, path)
+
+
+def seed_price_range(path: str, skip: dict) -> tuple[int, int]:
+    tokens = _search_tokens(path)
+    lo = int(re.sub(r"[^\d]", "", tokens.get("mn_p") or "") or 0)
+    hi = int(re.sub(r"[^\d]", "", tokens.get("mx_p") or "") or 0)
+    return lo, hi or int(skip.get("above") or 0)
 
 
 def _skipped(row: dict, skip: dict) -> bool:
@@ -39,6 +63,41 @@ def _skipped(row: dict, skip: dict) -> bool:
     return False
 
 
+def _plan_bands(fetcher: Fetcher, seed: str, skip: dict) -> list:
+    """Measure the search and, if it overflows the pager, split it by price.
+
+    One request per probe. Returns [None] (crawl the seed as-is) when the
+    search already fits.
+    """
+    def pages_for(lo: int, hi: int) -> int | None:
+        url = listing_api_url(with_prices(seed, lo, hi), page=1)
+        try:
+            return parse_list(fetcher.get(url), url)["total_pages"]
+        except Exception:
+            return None
+
+    probe = listing_api_url(seed, page=1)
+    try:
+        total = parse_list(fetcher.get(probe), probe)["total_pages"]
+    except Exception:
+        return [None]
+    if total <= PAGE_CEILING:
+        return [None]
+
+    lo, hi = seed_price_range(seed, skip)
+    if not hi:
+        print(f"  ! {total} pages but no price range to split on; "
+              f"only the first {PAGE_CEILING} pages are reachable",
+              file=sys.stderr, flush=True)
+        return [None]
+
+    print(f"  {total} pages exceeds the {PAGE_CEILING}-page pager limit; "
+          f"splitting €{lo:,}–€{hi:,} by price", flush=True)
+    bands = split_bands(pages_for, lo, hi, PAGE_CEILING, log=lambda m: print(m, flush=True))
+    print(f"  {len(bands)} bands: {describe(bands)}", flush=True)
+    return bands
+
+
 def crawl_search(con, fetcher: Fetcher, name: str, spec: dict, max_pages: int | None,
                  want_details: bool, redetail: bool, detail_limit: int | None = None,
                  workers: int = 1) -> dict:
@@ -50,44 +109,64 @@ def crawl_search(con, fetcher: Fetcher, name: str, spec: dict, max_pages: int | 
     skip = spec.get("skip", {})
 
     seed = spec["path"] if spec["path"].startswith("http") else BASE + spec["path"]
-    # HTML `?page=` is a no-op; featured/relevance paints luxury. Start on
-    # AdvertsListing with price_i so page 1 is the cheap end.
-    url = listing_api_url(seed, page=1)
-    while url:
-        try:
-            html = fetcher.get(url)
-        except RuntimeError as e:
-            print(f"  ! stopping: {e}", file=sys.stderr, flush=True)
-            if "403" in str(e) or "Forbidden" in str(e):
+
+    bands = [b for b in (spec.get("bands") or [])] or [None]
+    if bands == [None] and not max_pages:
+        bands = _plan_bands(fetcher, seed, skip)
+
+    for band in bands:
+        band_seed = seed if band is None else with_prices(seed, band[0], band[1])
+        if band:
+            print(f"  band €{band[0]:,}–€{band[1]:,}", flush=True)
+        band_pages = 0
+        # HTML `?page=` is a no-op; featured/relevance paints luxury. Start on
+        # AdvertsListing with price_i so page 1 is the cheap end.
+        url = listing_api_url(band_seed, page=1)
+        while url:
+            try:
+                html = fetcher.get(url)
+            except RuntimeError as e:
+                print(f"  ! stopping: {e}", file=sys.stderr, flush=True)
+                if "403" in str(e) or "Forbidden" in str(e):
+                    print(
+                        "  ! Green-Acres refused this IP. Cached pages in cache/ "
+                        "re-parse with zero requests.",
+                        file=sys.stderr, flush=True,
+                    )
+                break
+            if is_blocked(html):
                 print(
-                    "  ! Green-Acres refused this IP. Cached pages in cache/ "
+                    "  ! Cloudflare blocked this IP. Cached pages in cache/ "
                     "re-parse with zero requests.",
                     file=sys.stderr, flush=True,
                 )
-            break
-        if is_blocked(html):
-            print(
-                "  ! Cloudflare blocked this IP. Cached pages in cache/ "
-                "re-parse with zero requests.",
-                file=sys.stderr, flush=True,
-            )
-            break
-        page = parse_list(html, url)
-        pages += 1
-        for row in page["listings"]:
-            if _skipped(row, skip):
-                continue
-            row["source"] = SOURCE
-            row["external_id"] = str(row.get("external_id") or row.get("id"))
-            status, lid = db.upsert_from_list(con, row, name, ts, source=SOURCE)
-            counts[status] += 1
-            seen_ids.append(lid)
-        con.commit()
-        print(f"  page {pages}/{page['total_pages']}  "
-              f"({len(set(seen_ids))} listings)", flush=True)
-        if max_pages and pages >= max_pages:
-            break
-        url = page["next_url"]
+                break
+            page = parse_list(html, url)
+            pages += 1
+            band_pages += 1
+            for row in page["listings"]:
+                if _skipped(row, skip):
+                    continue
+                row["source"] = SOURCE
+                row["external_id"] = str(row.get("external_id") or row.get("id"))
+                status, lid = db.upsert_from_list(con, row, name, ts, source=SOURCE)
+                counts[status] += 1
+                seen_ids.append(lid)
+            con.commit()
+            print(f"  page {band_pages}/{page['total_pages']}  "
+                  f"({len(set(seen_ids))} listings)", flush=True)
+            if band_pages >= PAGE_CEILING:
+                # p_n=21 is a 404. Exactly 20 pages is a complete band, not a
+                # truncated one — only a band claiming more has lost its tail.
+                if page["total_pages"] > PAGE_CEILING:
+                    print(f"  ! band stopped at the {PAGE_CEILING}-page ceiling "
+                          f"with {page['total_pages']} pages claimed; narrow the "
+                          f"price range to reach the rest",
+                          file=sys.stderr, flush=True)
+                break
+            if max_pages and band_pages >= max_pages:
+                break
+            url = page["next_url"]
 
     seen_ids = list(dict.fromkeys(seen_ids))
 
