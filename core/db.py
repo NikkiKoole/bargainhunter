@@ -186,6 +186,28 @@ def _backfill_country(con: sqlite3.Connection) -> None:
             con.execute("UPDATE listings SET country=? WHERE id=?", (code, r["id"]))
 
 
+def clean_latlon(row: dict) -> None:
+    """Drop coordinates that cannot exist.
+
+    Unlike a wrong price, an out-of-range coordinate is not data to surface --
+    it is invalid by definition, and one of them poisons the whole map:
+    abruzzopropertyitaly serves `google.maps.LatLng(42.0476654, 139256123)` for
+    Sulmona (a lost decimal point), and that single row pushed Leaflet's
+    fitBounds to zoom 0 centred at longitude 69,628,031, hiding all 10,774
+    pins. We do not guess where the decimal belonged; we store nothing.
+    """
+    for key, limit in (("lat", 90.0), ("lon", 180.0)):
+        value = row.get(key)
+        if value is None:
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            row[key] = None
+            continue
+        row[key] = number if -limit <= number <= limit else None
+
+
 def _encode(value: Any) -> Any:
     return json.dumps(value, ensure_ascii=False) if isinstance(value, (list, dict)) else value
 
@@ -214,6 +236,8 @@ def upsert_from_list(con: sqlite3.Connection, row: dict, search: str, ts: str,
     data["promoted"] = int(bool(row.get("promoted")))
     data["source"] = src
     data["external_id"] = external_id
+    clean_latlon(row)
+    data["lat"], data["lon"] = row.get("lat"), row.get("lon")
     data["currency"] = row.get("currency") or DEFAULT_CURRENCY
     code = country_for(row, src)
     if code:
@@ -265,6 +289,7 @@ CLEARS_LIVING_M2 = {"franimo"}
 
 def update_from_detail(con: sqlite3.Connection, lid: int, detail: dict, ts: str) -> None:
     detail = as_row(detail)
+    clean_latlon(detail)
     data = {k: detail.get(k) for k in DETAIL_COLS if detail.get(k) is not None}
     if detail.get("raw_fields"):           # we did parse the info table, so trust it
         row = con.execute("SELECT source FROM listings WHERE id=?", (lid,)).fetchone()

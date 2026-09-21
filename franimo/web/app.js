@@ -298,6 +298,11 @@ function renderGrid(rows) {
   host.append(moreButton(rows.length));
 }
 
+const plottable = r =>
+  r.lat != null && r.lon != null &&
+  Number.isFinite(r.lat) && Number.isFinite(r.lon) &&
+  Math.abs(r.lat) <= 90 && Math.abs(r.lon) <= 180;
+
 function renderMap(rows) {
   if (!map) {
     map = L.map('map', { preferCanvas: true }).setView([46.8, 2.6], 6);
@@ -308,7 +313,9 @@ function renderMap(rows) {
   layer = L.layerGroup().addTo(map);
   const pts = [];
   rows.forEach(r => {
-    if (r.lat == null || r.lon == null) return;
+    // Belt and braces with the ingest check: a single impossible coordinate
+    // drags fitBounds to zoom 0 somewhere in the Pacific and hides every pin.
+    if (!plottable(r)) return;
     pts.push([r.lat, r.lon]);
     const m = L.circleMarker([r.lat, r.lon], {
       radius: 6, weight: 1, color: '#fff', fillColor: r.price_drop ? '#6fb07a' : '#d98b3a',

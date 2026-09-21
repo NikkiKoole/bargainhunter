@@ -86,20 +86,36 @@ every listing detail-fetched except Green-Acres, which has never run.
 
 **Unfinished, in priority order:**
 
-1. **Green-Acres has never been run here** (`ga-fr-houses-150k`, ~3,435 over 144
+1. **Green-Acres stops at page 21.** Ran 2026-09-21: the site reports 195
+   pages (4,680 houses) but its own `AdvertsListing` pager 404s on `p_n=21`,
+   so only **479** listings are reachable — not the 3,435 the README documents.
+   Same shape as franimo's pagination ceiling. Price bands are the likely fix
+   and the URL builder already emits `mn_p`, but **nobody has verified `mn_p`
+   is honoured** — `prc_max` on this site is silently ignored, so assume
+   nothing. Band machinery currently lives only in `franimo/scrape.py` and is
+   shaped around `pricefrom=`/`priceto=`; Green-Acres uses a token string.
+
+2. **(was: Green-Acres has never been run here)** (`ga-fr-houses-150k`, ~3,435 over 144
    list pages, 1s crawl-delay). Deliberately skipped — it overlaps franimo on
    France.
-2. **`abruzzoruralproperty` living area: 6%.** Not a parser bug. That portal has
+3. **`abruzzoruralproperty` living area: 6%.** Not a parser bug. That portal has
    no living-area field at all; the number is in prose in 86% of descriptions,
    mixed with cadastral and land areas ("800 sqm of land", "cadastral area of
    116 sqm"). Extracting it means deciding which area a sentence means. Left
    alone on purpose — a wrong guess silently corrupts the €/m² ranking.
 
-3. **akiyaportal has almost no plot size** (10 of 5,577). The portal states
+4. **akiyaportal has almost no plot size** (10 of 5,577). The portal states
    floor area but rarely land, so €/m² grond is empty for Japan. Not a parser
    bug as far as anyone has checked; nobody has looked hard.
 
 **Known source-data quirks — do not "fix" these:**
+
+* abruzzopropertyitaly serves a broken coordinate for Sulmona:
+  `google.maps.LatLng(42.0476654, 139256123)` — a lost decimal point. That one
+  row dragged Leaflet's fitBounds to zoom 0 past the dateline and hid all
+  11,200 pins. Impossible coordinates are now dropped at ingest
+  (`core.db.clean_latlon`) rather than repaired; we do not guess where a
+  decimal belonged.
 
 * Akiya Portal's real write-ups are behind a paid trial. What the JSON-LD gives
   is a price/location line, and it used to carry "Start a free trial for

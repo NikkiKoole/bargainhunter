@@ -418,3 +418,39 @@ class MarkGone(unittest.TestCase):
             self._see_again(con, range(8))             # it was only delisted briefly
             back = con.execute("SELECT COUNT(*) c FROM listings WHERE gone_at IS NOT NULL")
             self.assertEqual(back.fetchone()["c"], 0)
+
+
+class Coordinates(unittest.TestCase):
+    """One impossible coordinate hid every pin on the map: abruzzopropertyitaly
+    serves `google.maps.LatLng(42.0476654, 139256123)` for Sulmona, and
+    fitBounds then zoomed to 0 somewhere past the dateline."""
+
+    def test_out_of_range_longitude_is_dropped(self):
+        from core.db import clean_latlon
+        row = {"lat": 42.0476654, "lon": 139256123.0}
+        clean_latlon(row)
+        self.assertEqual(row["lat"], 42.0476654)   # the latitude was fine
+        self.assertIsNone(row["lon"])              # and we don't guess the decimal
+
+    def test_valid_coordinates_survive(self):
+        from core.db import clean_latlon
+        for lat, lon in [(48.85, 2.35), (-21.35, 55.73), (35.68, 139.69), (0, 0)]:
+            row = {"lat": lat, "lon": lon}
+            clean_latlon(row)
+            self.assertEqual((row["lat"], row["lon"]), (lat, lon))
+
+    def test_junk_becomes_none(self):
+        from core.db import clean_latlon
+        row = {"lat": "nonsense", "lon": None}
+        clean_latlon(row)
+        self.assertEqual((row["lat"], row["lon"]), (None, None))
+
+    def test_stored_rows_are_clean(self):
+        from core.db import connect, now, upsert_from_list
+        with tempfile.TemporaryDirectory() as tmp:
+            con = connect(Path(tmp) / "t.db")
+            upsert_from_list(con, {"external_id": "1", "url": "u", "price": 1,
+                                   "lat": 42.0476654, "lon": 139256123.0},
+                             "s", now(), source="abruzzopropertyitaly")
+            row = con.execute("SELECT lat, lon FROM listings").fetchone()
+            self.assertIsNone(row["lon"])
