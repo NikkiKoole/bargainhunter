@@ -317,6 +317,14 @@ def _total_pages(s: BeautifulSoup, n_cards: int) -> int:
     return last
 
 
+def _result_total(s: BeautifulSoup) -> int | None:
+    """`Found N` on the results heading. The <title> count is a different list."""
+    m = FOUND_RE.search(_txt(s.select_one("h2.stitle")) or "")
+    if not m:
+        return None
+    return int(m.group(1).replace(",", ""))
+
+
 def parse_list(html: str, page_url: str) -> dict[str, Any]:
     s = _soup(html)
     listings, seen = [], set()
@@ -329,7 +337,13 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
     total_pages = _total_pages(s, len(listings))
     current = _page_number(page_url)
     next_url = with_page(page_url, current + 1) if current < total_pages else None
-    return {"listings": listings, "total_pages": total_pages, "next_url": next_url}
+    out: dict[str, Any] = {
+        "listings": listings, "total_pages": total_pages, "next_url": next_url,
+    }
+    total = _result_total(s)
+    if total is not None:
+        out["total"] = total
+    return out
 
 
 # --------------------------------------------------------------------------

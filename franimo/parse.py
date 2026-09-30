@@ -44,6 +44,24 @@ def _txt(node) -> str | None:
     return re.sub(r"\s+", " ", t) or None
 
 
+# Cards per result page. `newsearch` estimates pages×14, and the ~714-page
+# ceiling is about 10k results — both land here.
+PER_PAGE = 14
+
+GEVONDEN_RE = re.compile(r"gevonden:\s*([\d.\s\u00a0]+)", re.I)
+
+
+def _result_total(s: BeautifulSoup) -> int | None:
+    """Headline count: `.total-amount`, else the title's `gevonden: N`."""
+    el = s.select_one(".total-amount")
+    if el is not None:
+        n = _int(_txt(el))
+        if n is not None:
+            return n
+    m = GEVONDEN_RE.search(_txt(s.find("title")) or "")
+    return _int(m.group(1)) if m else None
+
+
 # --------------------------------------------------------------------------
 # search result pages
 # --------------------------------------------------------------------------
@@ -96,7 +114,13 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
             "promoted": "top-property" in (box.get("class") or []),
         })
 
-    return {"listings": listings, "total_pages": total_pages, "next_url": next_url}
+    out: dict[str, Any] = {
+        "listings": listings, "total_pages": total_pages, "next_url": next_url,
+    }
+    total = _result_total(s)
+    if total is not None:
+        out["total"] = total
+    return out
 
 
 def _f(v) -> float | None:

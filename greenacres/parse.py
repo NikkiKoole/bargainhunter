@@ -532,7 +532,12 @@ def _parse_card(box, page_url: str) -> dict[str, Any] | None:
     }
 
 
-def _total_from_page(soup, json_count: int | None, listings: list) -> int:
+def _total_from_page(soup, json_count: int | None, _listings: list) -> int | None:
+    """Catalogue count from the API or the page headline.
+
+    The card list is only this page, so a missing headline returns None
+    rather than the number of cards.
+    """
     if json_count:
         return json_count
     info = _txt(soup.select_one(".pagination-info")) or ""
@@ -552,7 +557,7 @@ def _total_from_page(soup, json_count: int | None, listings: list) -> int:
             n = _int(offers.get("offerCount"))
             if n:
                 return n
-    return len(listings)
+    return None
 
 
 def parse_list(html: str, page_url: str) -> dict[str, Any]:
@@ -575,16 +580,20 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
     for box in soup.select(".announce-card"):
         _add(_parse_card(box, page_url))
 
-    count = _total_from_page(soup, json_count, listings)
+    known = _total_from_page(soup, json_count, listings)
+    count = known if known else len(listings)
     pages = math.ceil(count / PER_PAGE) if count else (1 if listings else 1)
     pages = max(1, pages)
     current = _page_number(page_url)
     next_url = with_page(page_url, current + 1) if current < pages else None
-    return {
+    out: dict[str, Any] = {
         "listings": listings,
         "total_pages": pages,
         "next_url": next_url,
     }
+    if known:
+        out["total"] = known
+    return out
 
 
 def _photos(soup, page_url: str) -> list[str]:

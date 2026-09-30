@@ -391,11 +391,14 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
     if pag and str(pag.get("value", "")).isdigit():
         current = max(1, int(pag["value"]))
     next_url = with_page(page_url, current + 1) if current < total_pages else None
-    return {
+    out: dict[str, Any] = {
         "listings": listings,
         "total_pages": total_pages,
         "next_url": next_url,
     }
+    if _count is not None:
+        out["total"] = _count
+    return out
 
 
 def _ld_blocks(soup) -> list[dict]:

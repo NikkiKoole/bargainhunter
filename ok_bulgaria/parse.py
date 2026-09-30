@@ -18,6 +18,9 @@ from .http import BASE
 
 SOURCE = "ok_bulgaria"
 DETAIL_PATH = "/houses_in_bulgaria_for_sale.php"
+PER_PAGE = 20  # cards per house-search page; title count / data-max-page
+
+TITLE_COUNT_RE = re.compile(r"(\d[\d\s,]*)\s+Bulgarian Properties\b", re.I)
 
 # Pretty-URL slug on the card's "details »" link, plus the `tid` query.
 TYPE_SLUGS = {
@@ -306,7 +309,15 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
             "raw_fields": priced["raw_fields"],
         })
 
-    return {"listings": listings, "total_pages": total_pages, "next_url": next_url}
+    out: dict[str, Any] = {
+        "listings": listings, "total_pages": total_pages, "next_url": next_url,
+    }
+    m = TITLE_COUNT_RE.search(_txt(s.find("title")) or "")
+    if m:
+        total = _int(m.group(1))
+        if total is not None:
+            out["total"] = total
+    return out
 
 
 # --------------------------------------------------------------------------

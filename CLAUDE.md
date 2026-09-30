@@ -39,6 +39,13 @@ python3 -m franimo.export                 # 2. only when you want Pages updated
 git add -A && git commit -m "data refresh" && git push   # 3. Pages rebuilds in ~1 min
 ```
 
+Before a full refresh, run `python3 -m core.probe` (one list page per enabled
+seed, no DB writes). It compares each portal's page-1 count to `data/meta.json`
+`searches[].n` and exits non-zero on material drift (|delta| ≥ 50 or ≥ 5% of
+ours). Blocked Cloudflare hosts are reported and not scored. Price-banded
+seeds are probed on the seed URL, not band 1; Green-Acres uses AdvertsListing
+so the signal is the seed's `advertsCount`, not the 20-page cap.
+
 Franimo is optional if France is already fresh. Export last — one combined
 `data/` for every source (bron facet). Full home-IP order, `--no-details`
 first, and the parked searches you may flip on: `PLAYBOOK.md`.
