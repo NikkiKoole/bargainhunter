@@ -118,6 +118,7 @@ class FixtureTotals(unittest.TestCase):
         page = parse_list(raw, "https://www.green-acres.fr/nl/AdvertListingActions/AdvertsListing?p_n=1")
         self.assertEqual(page["total"], 4670)
         self.assertEqual(page["total_pages"], 195)
+        self.assertNotIn("catalogue_currency", page)
 
 
 class ProbeBehavior(unittest.TestCase):
@@ -194,6 +195,32 @@ class ProbeBehavior(unittest.TestCase):
         self.assertEqual(row["delta"], 783)
         self.assertTrue(row["drift"])
         self.assertIn("wider than skip", row["note"])
+
+    def test_greenacres_usd_catalogue_is_labeled(self):
+        payload = json.dumps({
+            "html": (
+                '<script type="application/ld+json">'
+                '{"offers":{"@type":"AggregateOffer","offerCount":3417,'
+                '"priceCurrency":"USD"}}</script>'
+            ),
+            "advertsCount": 3417,
+        })
+
+        class Page:
+            def get(self, url):
+                return payload
+
+        row = probe_one(
+            "ga-fr-houses-150k",
+            {"source": "greenacres",
+             "path": "/onroerend-goed?searchQuery=lg-nl-cn-fr-hab_house-on-mx_p-150000",
+             "skip": {"above": 150000}},
+            Page(),
+            4655,
+        )
+        self.assertEqual(row["live"], 3417)
+        self.assertIn("USD catalogue", row["note"])
+        self.assertTrue(row["drift"])
 
     def test_report_marks_drift(self):
         rows = [{

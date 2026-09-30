@@ -593,6 +593,10 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
     }
     if known:
         out["total"] = known
+    # A datacenter IP often gets a USD catalogue, and mx_p is then a dollar
+    # cap rather than the euro one a home-IP scrape stored.
+    if '"priceCurrency":"USD"' in body or '"priceCurrency": "USD"' in body:
+        out["catalogue_currency"] = "USD"
     return out
 
 

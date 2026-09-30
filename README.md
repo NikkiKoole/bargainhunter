@@ -117,7 +117,10 @@ URL**, not band 1: page 1 already has the headline for the whole filter.
 Green-Acres goes through AdvertsListing, the same endpoint the scraper
 paginates, so `advertsCount` is that seed total. The 20-page pager cap hides
 cards, not the count; band 1 would be ~480 listings and would always look
-like a collapse next to the published catalogue.
+like a collapse next to the published catalogue. From a datacenter IP that
+response is often a USD catalogue (`mx_p` as a dollar cap); the row then
+says `USD catalogue` and the headline (~3.4k) is not the euro total a
+home-IP scrape stored.
 
 Two gaps are structural, not a sign the scrape failed: Centrarium's seed is
 the cheap-first house list (~800) while `skip.above` stores only the ≤€100k

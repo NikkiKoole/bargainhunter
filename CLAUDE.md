@@ -44,7 +44,8 @@ seed, no DB writes). It compares each portal's page-1 count to `data/meta.json`
 `searches[].n` and exits non-zero on material drift (|delta| ≥ 50 or ≥ 5% of
 ours). Blocked Cloudflare hosts are reported and not scored. Price-banded
 seeds are probed on the seed URL, not band 1; Green-Acres uses AdvertsListing
-so the signal is the seed's `advertsCount`, not the 20-page cap.
+so the signal is the seed's `advertsCount`, not the 20-page cap. A datacenter
+response is often priced in USD — the row says `USD catalogue`.
 
 Franimo is optional if France is already fresh. Export last — one combined
 `data/` for every source (bron facet). Full home-IP order, `--no-details`

@@ -22,7 +22,9 @@ that URL carries the portal's headline for the whole filter. Green-Acres
 is fetched through AdvertsListing (the same endpoint the scraper
 paginates) so ``advertsCount`` is that seed total; the 20-page pager cap
 hides cards, not the count. Band 1 would only be ~480 listings and would
-always look like a collapse next to the published ~4.6k.
+always look like a collapse next to the published ~4.6k. A datacenter IP
+often receives that count in USD (``mx_p`` as a dollar cap); the row is
+then marked ``USD catalogue``.
 
 Where the page states a result count, ``parse_list`` puts it on ``total``
 and the row is ``exact``. Otherwise live is
@@ -235,6 +237,8 @@ def probe_one(name: str, spec: dict, fetcher, ours: int | None, *,
         return _row(name, source, ours, None, "blocked")
     live, kind = live_count(page, source)
     note = _note(kind, spec, ours, live)
+    if page.get("catalogue_currency") == "USD":
+        note = f"{note}; USD catalogue"
     if ours is None:
         note = f"{note}; no published count"
     drift = is_drift(ours, live, pct=pct, min_delta=min_delta)
