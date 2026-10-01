@@ -487,11 +487,14 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
         nxt = with_page(page_url, current + 1)
         if not DISALLOWED_PATH_RE.search(nxt):
             next_url = nxt
-    return {
+    out: dict[str, Any] = {
         "listings": listings,
         "total_pages": total_pages,
         "next_url": next_url,
     }
+    if _count is not None:
+        out["total"] = _count
+    return out
 
 
 def _ld_blocks(soup) -> list[dict]:

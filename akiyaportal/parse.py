@@ -324,13 +324,31 @@ def _total_pages(s: BeautifulSoup, page_url: str, n_cards: int) -> int:
     return last
 
 
+def _result_total(s: BeautifulSoup) -> int | None:
+    """Filtered count. The title's `53595+` is the unfiltered catalogue."""
+    form = s.select_one("[data-analytics-results-count]")
+    raw = form.get("data-analytics-results-count") if form else None
+    if raw and str(raw).isdigit():
+        return int(raw)
+    m = re.search(r"([\d,]+)\s+Properties Found", s.get_text(" ", strip=True), re.I)
+    if m:
+        return int(m.group(1).replace(",", ""))
+    return None
+
+
 def parse_list(html: str, page_url: str) -> dict[str, Any]:
     s = _soup(html)
     listings = _parse_listings_grid(s, page_url) or _parse_hub_cards(s, page_url)
     total_pages = _total_pages(s, page_url, len(listings))
     current = _page_number(page_url)
     next_url = with_page(page_url, current + 1) if current < total_pages else None
-    return {"listings": listings, "total_pages": total_pages, "next_url": next_url}
+    out: dict[str, Any] = {
+        "listings": listings, "total_pages": total_pages, "next_url": next_url,
+    }
+    total = _result_total(s)
+    if total is not None:
+        out["total"] = total
+    return out
 
 
 # --------------------------------------------------------------------------

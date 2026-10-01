@@ -510,6 +510,23 @@ def _parse_card(box, page_url: str) -> dict[str, Any] | None:
     }
 
 
+def _catalogue_total(soup, blocks: list[dict]) -> int | None:
+    """Headline count (`numberOfItems` / `N annonces`), not this page's cards."""
+    for block in blocks:
+        if "itemlist" in _types_of(block):
+            n = _int(block.get("numberOfItems"))
+            if n:
+                return n
+    h1 = _txt(soup.select_one("h1")) or _txt(soup.title)
+    if h1:
+        m = ANNONCES_RE.search(h1)
+        if m:
+            n = _int(m.group(1))
+            if n:
+                return n
+    return None
+
+
 def _total_from_page(soup, blocks: list[dict], listings: list) -> int:
     for block in blocks:
         if "itemlist" in _types_of(block):
@@ -576,11 +593,15 @@ def parse_list(html: str, page_url: str) -> dict[str, Any]:
     pages = max(1, min(pages, PAGE_CEILING))
     current = _page_number(page_url)
     next_url = with_page(page_url, current + 1) if current < pages else None
-    return {
+    out: dict[str, Any] = {
         "listings": listings,
         "total_pages": pages,
         "next_url": next_url,
     }
+    catalogue = _catalogue_total(soup, blocks)
+    if catalogue:
+        out["total"] = catalogue
+    return out
 
 
 def _ld_listing(blocks: list[dict]) -> dict:

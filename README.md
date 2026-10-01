@@ -89,6 +89,45 @@ Typical flow for a big search: `--no-details` first so the UI is usable, then le
 detail backfill run in the background. `--db` points a trial at a scratch
 sqlite file so you do not write `db/franimo.db`.
 
+### Is the published data stale?
+
+Before a full refresh, run `python3 -m core.probe`. It fetches **one list
+page** per enabled seed (named seeds, including parked ones, if you pass
+them), reads the portal's result count, and compares it to `data/meta.json`
+(`searches[].n`). It does not write the database and does not fetch detail
+pages. `--refresh` is the default, so a stale `cache/` entry is not the count.
+
+```sh
+python3 -m core.probe
+python3 -m core.probe france-150k bg-houses-50k
+python3 -m core.probe --quiet
+```
+
+Exit status is 1 when any seed has drifted: `|live − ours|` is at least 50
+listings, or at least 5% of the published count (`--min-delta` / `--threshold`).
+A blocked or empty fetch is a row in the table, not a crash, and is not
+scored — Holprop and Le Figaro Immobilier are often Cloudflare from a
+datacenter.
+
+`exact` means the page stated a total (`total` on `parse_list`). `estimate`
+means only `total_pages` was known:
+`(pages − 1) × page size + cards on page 1`, which assumes the last page is
+full. Price-banded searches (franimo, Green-Acres) are probed on the **seed
+URL**, not band 1: page 1 already has the headline for the whole filter.
+Green-Acres goes through AdvertsListing, the same endpoint the scraper
+paginates, so `advertsCount` is that seed total. The 20-page pager cap hides
+cards, not the count; band 1 would be ~480 listings and would always look
+like a collapse next to the published catalogue. From a datacenter IP that
+response is often a USD catalogue (`mx_p` as a dollar cap); the row then
+says `USD catalogue` and the headline (~3.4k) is not the euro total a
+home-IP scrape stored.
+
+Two gaps are structural, not a sign the scrape failed: Centrarium's seed is
+the cheap-first house list (~800) while `skip.above` stores only the ≤€100k
+slice, and Abruzzo Rural Property's pager includes SOLD / UNDER OFFER cards
+that `skip.priceless` drops. Those rows say so (`list wider than skip`, or
+`estimate`).
+
 ## When you're home
 
 Holprop and Le Figaro Immobilier are blocked from datacenter IPs
@@ -827,6 +866,7 @@ core/searches.py    searches.json loader (`source` defaults to franimo)
 core/export.py      SQLite → packed JSON + static UI at repo root
 core/serve.py       localhost UI + JSON API
 core/adapter.py     SourceAdapter protocol / registry
+core/probe.py       one-page freshness check vs data/meta.json (`python3 -m core.probe`)
 ok_bulgaria/        cheap-bulgarian-house.co.uk adapter + CLI
 akiyaportal/        akiyaportal.com adapter + CLI
 holprop/            holprop.com adapter + CLI

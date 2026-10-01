@@ -16,7 +16,11 @@ class SourceAdapter(Protocol):
     base: str
 
     def parse_list(self, html: str, page_url: str) -> dict[str, Any]:
-        """Return {listings: [dict], total_pages: int, next_url: str | None}."""
+        """Return {listings, total_pages, next_url}.
+
+        Optional keys scrapers ignore: `total` (exact portal result count
+        when the page states one) and `blocked` (a challenge page).
+        """
         ...
 
     def parse_detail(self, html: str, url: str) -> dict[str, Any]:
